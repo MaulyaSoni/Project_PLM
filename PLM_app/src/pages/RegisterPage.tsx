@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Cog } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Role } from '@/data/mockData';
+import axios from 'axios';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -26,8 +27,11 @@ export default function RegisterPage() {
       await register(name, email, password, role);
       toast.success('Account created');
       navigate('/dashboard');
-    } catch {
-      toast.error('Registration failed');
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error || 'Registration failed')
+        : 'Registration failed';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

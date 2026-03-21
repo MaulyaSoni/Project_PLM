@@ -22,9 +22,13 @@ import { useEffect } from 'react';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialType?: ECOType;
+  initialProductId?: string;
+  initialBOMId?: string;
+  initialTitle?: string;
 }
 
-export default function CreateECODialog({ open, onOpenChange }: Props) {
+export default function CreateECODialog({ open, onOpenChange, initialType, initialProductId, initialBOMId, initialTitle }: Props) {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ECOType | ''>('');
@@ -48,6 +52,23 @@ export default function CreateECODialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
 
   useEffect(() => { fetchProducts(); fetchBOMs(); }, [fetchProducts, fetchBOMs]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (initialType) setType(initialType);
+    if (initialTitle) setTitle(initialTitle);
+
+    if (initialProductId) {
+      handleProductSelect(initialProductId);
+      setProductId(initialProductId);
+    }
+
+    if (initialBOMId) {
+      handleBOMSelect(initialBOMId);
+      setBomId(initialBOMId);
+    }
+  }, [open, initialType, initialProductId, initialBOMId, initialTitle]);
 
   const selectedProduct = products.find(p => p.id === productId);
   const selectedBOM = boms.find(b => b.id === bomId);

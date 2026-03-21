@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  ENGINEERING
+  APPROVER
+  OPERATIONS
+}
+
+enum ECOType {
+  PRODUCT
+  BOM
+}
+
+enum Status {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ECOStageStatus {
+  NEW
+  IN_REVIEW
+  APPROVED
+  DONE
+}
+
+enum AuditActionType {
+  CREATE
+  UPDATE
+  APPROVE
+  REJECT
+  ARCHIVE
+}
+
+model User {
+  id          String        @id @default(uuid())
+  name        String
+  email       String        @unique
+  password    String
+  role        Role          @default(ENGINEERING)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+
+  ecos        ECO[]         @relation("CreatedECOs")
+  assignedEco ECO[]         @relation("AssignedECOs")
+  approvals   ECOApproval[]
+  auditLogs   AuditLog[]
+}
+
+model Product {
+  id             String           @id @default(uuid())
+  name           String
+  currentVersion Int              @default(1)
+  status         Status           @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+
+  versions       ProductVersion[]
+  ecos           ECO[]
+  boms           BOM[]
+}
+
+model ProductVersion {
+  id         String   @id @default(uuid())
+  productId  String
+  version    Int
+  salePrice  Float
+  costPrice  Float
+  status     Status   @default(ACTIVE)
+  createdAt  DateTime @default(now())
+  createdVia String?
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, version])
+}
+
+model BOM {
+  id         String         @id @default(uuid())
+  productId  String
+  version    Int            @default(1)
+  status     Status         @default(ACTIVE)
+  createdAt  DateTime       @default(now())
+
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  components BOMComponent[]
+  operations BOMOperation[]
+  ecos       ECO[]
+}
+
+model BOMComponent {
+  id             String  @id @default(uuid())
+  bomId          String
+  componentName  String
+  quantity       Float
+  unit           String
+
+  bom            BOM     @relation(fields: [bomId], references: [id], onDelete: Cascade)
+}
+
+model BOMOperation {
+  id          String  @id @default(uuid())
+  bomId       String
+  name        String
+  duration    Int
+  workCenter  String
+
+  bom         BOM     @relation(fields: [bomId], references: [id], onDelete: Cascade)
+}
+
+model ECOStage {
+  id               String  @id @default(uuid())
+  name             String  @unique
+  order            Int     @unique
+  requiresApproval Boolean @default(false)
+
+  ecos             ECO[]
+}
+
+model ECO {
+  id                 String          @id @default(uuid())
+  title              String
+  type               ECOType
+  productId          String
+  bomId              String?
+  userId             String
+  assignedToId       String?
+  effectiveDate      DateTime?
+  versionUpdate      Boolean         @default(true)
+  stageId            String
+  status             ECOStageStatus  @default(NEW)
+  productChanges     Json?
+  bomComponentChanges Json?
+  createdAt          DateTime        @default(now())
+
+  product            Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  bom                BOM?            @relation(fields: [bomId], references: [id], onDelete: SetNull)
+  user               User            @relation("CreatedECOs", fields: [userId], references: [id], onDelete: Restrict)
+  assignedTo         User?           @relation("AssignedECOs", fields: [assignedToId], references: [id], onDelete: SetNull)
+  stage              ECOStage        @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  approvals          ECOApproval[]
+  auditLogs          AuditLog[]
+}
+
+model ECOApproval {
+  id         String   @id @default(uuid())
+  ecoId      String
+  userId     String
+  approved   Boolean
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  eco        ECO      @relation(fields: [ecoId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([ecoId, userId])
+}
+
+model AuditLog {
+  id         String          @id @default(uuid())
+  ecoId      String?
+  userId     String
+  action     String
+  actionType AuditActionType
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime        @default(now())
+
+  eco        ECO?            @relation(fields: [ecoId], references: [id], onDelete: SetNull)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+}

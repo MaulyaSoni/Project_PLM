@@ -23,7 +23,7 @@ const App = () => (
     <TooltipProvider>
       <Sonner position="top-right" />
       <ErrorBoundary>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />

@@ -1,22 +1,20 @@
-import { mockECOs, mockProducts, mockBOMs, mockAuditLog } from '@/data/mockData';
-
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+import api from './api';
 
 export const reportsService = {
   async getECOReport() {
-    await delay(300);
-    return mockECOs;
+    const { data } = await api.get('/reports/eco');
+    return data;
   },
   async getVersionHistory(productId: string) {
-    await delay(200);
-    return mockProducts.find(p => p.id === productId)?.versions || [];
+    const { data } = await api.get(`/reports/versions/${productId}`);
+    return data;
   },
   async getBOMHistory(productId: string) {
-    await delay(200);
-    return mockBOMs.filter(b => b.productId === productId);
+    const { data } = await api.get(`/reports/bom-history/${productId}`);
+    return data;
   },
   async getAuditLog() {
-    await delay(300);
-    return [...mockAuditLog];
+    const { data } = await api.get('/reports/audit-log');
+    return data;
   },
 };

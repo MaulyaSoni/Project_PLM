@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Eye, GitPullRequest, Archive, Search, Layers, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BOM, BOMComponent, BOMOperation } from '@/data/mockData';
+import CreateECODialog from '@/components/CreateECODialog';
 
 export default function BOMsPage() {
   const { boms, isLoading, fetchBOMs, createBOM, archiveBOM } = useBOMStore();
@@ -29,6 +30,8 @@ export default function BOMsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [detailBOM, setDetailBOM] = useState<BOM | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+  const [createEcoOpen, setCreateEcoOpen] = useState(false);
+  const [ecoBOMTarget, setEcoBOMTarget] = useState<{ productId: string; bomId: string } | null>(null);
 
   // New BOM form
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -65,6 +68,12 @@ export default function BOMsPage() {
 
   const handleArchive = async () => {
     if (archiveTarget) { await archiveBOM(archiveTarget); setArchiveTarget(null); toast.success('BOM archived'); }
+  };
+
+  const handleRaiseEco = (bom: BOM) => {
+    if (bom.status === 'ARCHIVED') return;
+    setEcoBOMTarget({ productId: bom.productId, bomId: bom.id });
+    setCreateEcoOpen(true);
   };
 
   if (isLoading) return <LoadingSpinner />;
@@ -105,7 +114,7 @@ export default function BOMsPage() {
                     <TableCell className="text-muted-foreground text-sm">{b.createdAt}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="ghost" size="sm" onClick={() => setDetailBOM(b)}><Eye className="h-4 w-4" /></Button>
-                      {canEdit && <Button variant="ghost" size="sm" disabled={b.status === 'ARCHIVED'}><GitPullRequest className="h-4 w-4" /></Button>}
+                      {canEdit && <Button variant="ghost" size="sm" disabled={b.status === 'ARCHIVED'} onClick={() => handleRaiseEco(b)}><GitPullRequest className="h-4 w-4" /></Button>}
                       {canArchive && b.status === 'ACTIVE' && <Button variant="ghost" size="sm" onClick={() => setArchiveTarget(b.id)}><Archive className="h-4 w-4 text-destructive" /></Button>}
                     </TableCell>
                   </TableRow>
@@ -192,6 +201,14 @@ export default function BOMsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CreateECODialog
+        open={createEcoOpen}
+        onOpenChange={setCreateEcoOpen}
+        initialType="BOM"
+        initialProductId={ecoBOMTarget?.productId}
+        initialBOMId={ecoBOMTarget?.bomId}
+      />
 
       <ConfirmDialog open={!!archiveTarget} onOpenChange={() => setArchiveTarget(null)} title="Archive BOM" description="Are you sure you want to archive this BOM?" confirmLabel="Archive" variant="destructive" onConfirm={handleArchive} />
     </div>

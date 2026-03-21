@@ -17,6 +17,7 @@ import { Plus, Eye, GitPullRequest, Archive, Search, Package } from 'lucide-reac
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Product } from '@/data/mockData';
+import CreateECODialog from '@/components/CreateECODialog';
 
 export default function ProductsPage() {
   const { products, isLoading, fetchProducts, createProduct, archiveProduct } = useProductStore();
@@ -27,6 +28,8 @@ export default function ProductsPage() {
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
   const [newProduct, setNewProduct] = useState({ name: '', salePrice: '', costPrice: '' });
+  const [createEcoOpen, setCreateEcoOpen] = useState(false);
+  const [ecoProductId, setEcoProductId] = useState<string>('');
 
   const canEdit = user?.role === 'ADMIN' || user?.role === 'ENGINEERING';
   const canArchive = user?.role === 'ADMIN';
@@ -52,6 +55,12 @@ export default function ProductsPage() {
       setArchiveTarget(null);
       toast.success('Product archived');
     }
+  };
+
+  const handleRaiseEco = (product: Product) => {
+    if (product.status === 'ARCHIVED') return;
+    setEcoProductId(product.id);
+    setCreateEcoOpen(true);
   };
 
   if (isLoading) return <LoadingSpinner />;
@@ -111,7 +120,7 @@ export default function ProductsPage() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span>
-                              <Button variant="ghost" size="sm" disabled={p.status === 'ARCHIVED'}>
+                              <Button variant="ghost" size="sm" disabled={p.status === 'ARCHIVED'} onClick={() => handleRaiseEco(p)}>
                                 <GitPullRequest className="h-4 w-4" />
                               </Button>
                             </span>
@@ -174,10 +183,24 @@ export default function ProductsPage() {
                   ))}
                 </TableBody>
               </Table>
+              {canEdit && detailProduct.status !== 'ARCHIVED' && (
+                <div className="mt-4">
+                  <Button className="w-full" onClick={() => handleRaiseEco(detailProduct)}>
+                    <GitPullRequest className="h-4 w-4 mr-2" />Raise ECO for this Product
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </SheetContent>
       </Sheet>
+
+      <CreateECODialog
+        open={createEcoOpen}
+        onOpenChange={setCreateEcoOpen}
+        initialType="PRODUCT"
+        initialProductId={ecoProductId || undefined}
+      />
 
       <ConfirmDialog open={!!archiveTarget} onOpenChange={() => setArchiveTarget(null)} title="Archive Product" description="Are you sure? This will mark the product as archived." confirmLabel="Archive" variant="destructive" onConfirm={handleArchive} />
     </div>

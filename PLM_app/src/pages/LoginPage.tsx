@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Cog } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('alice@plmcontrol.com');
@@ -22,8 +23,11 @@ export default function LoginPage() {
       await login(email, password);
       toast.success('Logged in successfully');
       navigate('/dashboard');
-    } catch {
-      toast.error('Invalid credentials');
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error || 'Login failed')
+        : 'Login failed';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

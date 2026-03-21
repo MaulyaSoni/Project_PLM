@@ -1,30 +1,20 @@
-import { mockBOMs, type BOM } from '@/data/mockData';
-
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+import api from './api';
+import type { BOM } from '@/data/mockData';
 
 export const bomService = {
   async getAll(): Promise<BOM[]> {
-    await delay(300);
-    return [...mockBOMs];
+    const { data } = await api.get('/boms');
+    return data;
   },
   async getById(id: string): Promise<BOM | undefined> {
-    await delay(200);
-    return mockBOMs.find(b => b.id === id);
+    const { data } = await api.get(`/boms/${id}`);
+    return data;
   },
   async create(data: Partial<BOM>): Promise<BOM> {
-    await delay(400);
-    const bom: BOM = {
-      id: 'b' + Date.now(), productId: data.productId!, productName: data.productName!,
-      currentVersion: 1, status: 'ACTIVE', createdAt: new Date().toISOString().split('T')[0],
-      components: data.components || [], operations: data.operations || [],
-      versions: [{ version: 1, status: 'ACTIVE', createdAt: new Date().toISOString().split('T')[0], components: data.components || [], operations: data.operations || [] }],
-    };
-    mockBOMs.push(bom);
-    return bom;
+    const response = await api.post('/boms', data);
+    return response.data;
   },
   async archive(id: string): Promise<void> {
-    await delay(300);
-    const b = mockBOMs.find(b => b.id === id);
-    if (b) b.status = 'ARCHIVED';
+    await api.patch(`/boms/${id}/archive`);
   },
 };
