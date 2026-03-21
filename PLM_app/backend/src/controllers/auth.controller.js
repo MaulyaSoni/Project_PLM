@@ -26,26 +26,6 @@ const normalizeDbUser = (user) => ({
   passwordHash: user.passwordHash || user.password,
 });
 
-const findUserByEmailFallback = async (email) => {
-  const rows = await prisma.$queryRaw`
-    SELECT id, name, email, role, password_hash AS "passwordHash", created_at AS "createdAt"
-    FROM users
-    WHERE email = ${email}
-    LIMIT 1
-  `;
-  return rows[0] || null;
-};
-
-const findUserByIdFallback = async (id) => {
-  const rows = await prisma.$queryRaw`
-    SELECT id, name, email, role, password_hash AS "passwordHash", created_at AS "createdAt"
-    FROM users
-    WHERE id = ${id}::uuid
-    LIMIT 1
-  `;
-  return rows[0] || null;
-};
-
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -53,33 +33,18 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'name, email and password are required' });
     }
 
-    let existing;
-    try {
-      existing = await prisma.user.findUnique({ where: { email } });
-    } catch (_error) {
-      existing = await findUserByEmailFallback(email);
-    }
+    let existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(400).json({ error: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 10);
-    let user;
-    try {
-      user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashed,
-          role: role || 'ENGINEERING',
-        },
-      });
-    } catch (_error) {
-      const rows = await prisma.$queryRaw`
-        INSERT INTO users (name, email, password_hash, role)
-        VALUES (${name}, ${email}, ${hashed}, ${role || 'ENGINEERING'})
-        RETURNING id, name, email, role, password_hash AS "passwordHash", created_at AS "createdAt"
-      `;
-      user = rows[0];
-    }
+    let user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashed,
+        role: role || 'ENGINEERING',
+      },
+    });
 
     const token = signToken(user);
     return res.status(201).json({ token, user: sanitizeUser(user) });
@@ -96,12 +61,8 @@ const login = async (req, res) => {
       return res.status(400).json({ error: 'email and password are required' });
     }
 
-    let user;
-    try {
-      user = await prisma.user.findUnique({ where: { email } });
-    } catch (_error) {
-      user = await findUserByEmailFallback(email);
-    }
+    let user = await prisma.user.findUnique({ where: { email } });
+    
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const normalized = normalizeDbUser(user);
@@ -118,12 +79,7 @@ const login = async (req, res) => {
 
 const getMe = async (req, res) => {
   try {
-    let user;
-    try {
-      user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    } catch (_error) {
-      user = await findUserByIdFallback(req.user.id);
-    }
+    let user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     return res.json(sanitizeUser(user));

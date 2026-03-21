@@ -16,8 +16,13 @@ export const useProductStore = create<ProductState>((set) => ({
 
   fetchProducts: async () => {
     set({ isLoading: true });
-    const products = await productsService.getAll();
-    set({ products, isLoading: false });
+    try {
+      const products = await productsService.getAll();
+      set({ products, isLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+      set({ isLoading: false });
+    }
   },
 
   createProduct: async (data) => {

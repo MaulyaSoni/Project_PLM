@@ -16,8 +16,13 @@ export const useBOMStore = create<BOMState>((set) => ({
 
   fetchBOMs: async () => {
     set({ isLoading: true });
-    const boms = await bomService.getAll();
-    set({ boms, isLoading: false });
+    try {
+      const boms = await bomService.getAll();
+      set({ boms, isLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch BOMs:', error);
+      set({ isLoading: false });
+    }
   },
 
   createBOM: async (data) => {
