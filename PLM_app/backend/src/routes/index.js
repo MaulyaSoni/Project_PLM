@@ -9,6 +9,7 @@ const registerRoutes = (app) => {
   app.use('/api/products', productsRoutes);
   app.use('/api/boms', bomRoutes);
   app.use('/api/eco', ecoRoutes);
+  app.use('/api/ecos', ecoRoutes);
   app.use('/api/reports', reportsRoutes);
 };
 

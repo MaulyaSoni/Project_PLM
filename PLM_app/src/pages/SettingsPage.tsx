@@ -13,6 +13,7 @@ import { Plus, GripVertical, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { mockUsers } from '@/data/mockData';
 import type { Role } from '@/data/mockData';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const defaultStages = [
   { id: '1', name: 'New', order: 1, requiresApproval: false },
@@ -21,6 +22,7 @@ const defaultStages = [
 ];
 
 export default function SettingsPage() {
+  const { user } = useAuthStore();
   const [stages, setStages] = useState(defaultStages);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -80,7 +82,14 @@ export default function SettingsPage() {
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                     <TableCell><RoleBadge role={u.role} /></TableCell>
                     <TableCell className="text-right">
-                      <Select defaultValue={u.role}>
+                      <Select
+                        defaultValue={u.role}
+                        onValueChange={() => {
+                          if (u.id === user?.id) {
+                            toast.error('You cannot change your own role');
+                          }
+                        }}
+                      >
                         <SelectTrigger className="w-32 h-8 bg-muted border-border text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ADMIN">Admin</SelectItem>

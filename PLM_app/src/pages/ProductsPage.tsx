@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, Eye, GitPullRequest, Archive, Search, Package } from 'lucide-react';
+import { Plus, Eye, GitPullRequest, Archive, Search, Package, ShieldCheck, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Product } from '@/data/mockData';
@@ -66,23 +66,75 @@ export default function ProductsPage() {
   if (isLoading) return <LoadingSpinner />;
 
   return (
-    <div className="animate-fade-in">
-      <PageHeader
-        title="Product Master"
-        subtitle="Manage your product catalog"
-        action={canEdit ? <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-2" />Add Product</Button> : undefined}
-      />
+    <div className="animate-fade-in text-white pb-12">
+      {/* Header section with Tagline */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-widest mb-3">
+            <Package className="h-3 w-3" /> Core Catalog
+          </div>
+          <h1 className="text-4xl font-display font-bold tracking-tight text-white mb-2">Product Master Grid</h1>
+          <p className="text-primary/90 tracking-wide font-medium italic">
+            "Smart Product Management with Controlled Changes"
+          </p>
+        </div>
+        {canEdit && (
+          <Button onClick={() => setAddOpen(true)} className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_20px_-5px_rgba(0,242,255,0.5)] border-0 h-11 px-6 whitespace-nowrap">
+            <Plus className="h-5 w-5 mr-2" /> Initialize Product
+          </Button>
+        )}
+      </div>
+
+      {/* PLM Info Banner */}
+      <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
+        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-card border border-white/10 shadow-xl p-6">
+          <div className="absolute -top-24 -right-12 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="text-primary h-5 w-5" />
+              <h3 className="font-display font-bold text-lg text-white">What Does It Do?</h3>
+            </div>
+            <p className="text-white leading-relaxed mb-4 font-medium text-[15px]">
+              This platform manages products and their changes in a structured and controlled way. A Product Lifecycle Management (PLM) system that enables secure, version-controlled, and approval-driven changes.
+            </p>
+            <p className="text-white/80 leading-relaxed text-sm">
+              Instead of allowing direct edits, it ensures that every modification goes through a proper approval process before being applied. It maintains version history, tracks changes, and ensures that only approved data is used in operations.
+            </p>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl bg-card border border-white/10 shadow-xl p-6">
+          <div className="absolute -bottom-24 -right-12 w-64 h-64 bg-success/10 rounded-full blur-[80px] pointer-events-none"></div>
+          <div className="relative z-10">
+            <h3 className="font-display font-bold text-white mb-4 flex items-center gap-2">
+              <Zap className="text-success h-4 w-4" /> Core Advantages
+            </h3>
+            <ul className="space-y-2.5 text-sm text-white/90 font-medium">
+              <li className="flex items-start gap-2"><span className="text-success select-none">✔</span> Prevents accidental data loss</li>
+              <li className="flex items-start gap-2"><span className="text-success select-none">✔</span> Maintains complete version history</li>
+              <li className="flex items-start gap-2"><span className="text-success select-none">✔</span> Only approved changes applied</li>
+              <li className="flex items-start gap-2"><span className="text-success select-none">✔</span> Provides full traceability</li>
+              <li className="flex items-start gap-2"><span className="text-success select-none">✔</span> Reduces risk in production</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-muted border-border" />
+      <div className="flex items-center gap-4 mb-6 flex-wrap p-4 rounded-2xl bg-card/30 backdrop-blur-md border border-white/5 shadow-lg">
+        <div className="relative flex-1 min-w-[280px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+          <Input
+            placeholder="Search product nodes..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-11 h-12 bg-black/20 border-white/10 text-white placeholder:text-white/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 rounded-xl"
+          />
         </div>
-        <div className="flex bg-muted rounded-md p-0.5">
+        <div className="flex bg-black/20 border border-white/10 rounded-xl p-1 h-12">
           {(['ALL', 'ACTIVE', 'ARCHIVED'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-colors ${statusFilter === s ? 'bg-card text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${statusFilter === s ? 'bg-primary/20 text-primary shadow-[0_0_10px_rgba(0,242,255,0.2)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
               {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
             </button>
           ))}
@@ -90,46 +142,53 @@ export default function ProductsPage() {
       </div>
 
       {/* Table */}
-      <Card className="bg-card border-border">
+      <Card className="bg-card/40 backdrop-blur-xl border border-white/5 shadow-2xl overflow-hidden rounded-2xl">
         <CardContent className="p-0">
-          {filtered.length === 0 ? <EmptyState message="No products found" icon={Package} /> : (
+          {filtered.length === 0 ? (
+            <EmptyState
+              message="No products found. Create your first product."
+              icon={Package}
+              actionLabel={canEdit ? 'Create Product' : undefined}
+              onAction={canEdit ? () => setAddOpen(true) : undefined}
+            />
+          ) : (
             <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Sale Price</TableHead>
-                  <TableHead>Cost Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+              <TableHeader className="bg-white/[0.02]">
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="text-white font-semibold py-5 px-6 text-xs uppercase tracking-wider">Product Name</TableHead>
+                  <TableHead className="text-white font-semibold py-5 text-xs uppercase tracking-wider">Version</TableHead>
+                  <TableHead className="text-white font-semibold py-5 text-xs uppercase tracking-wider">Sale Price</TableHead>
+                  <TableHead className="text-white font-semibold py-5 text-xs uppercase tracking-wider">Cost Price</TableHead>
+                  <TableHead className="text-white font-semibold py-5 text-xs uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="text-white font-semibold py-5 text-xs uppercase tracking-wider">Initialized</TableHead>
+                  <TableHead className="text-right text-white font-semibold py-5 pr-6 text-xs uppercase tracking-wider">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
-                  <TableRow key={p.id} className="border-border">
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="text-muted-foreground">v{p.currentVersion}</TableCell>
-                    <TableCell>${p.salePrice.toLocaleString()}</TableCell>
-                    <TableCell>${p.costPrice.toLocaleString()}</TableCell>
+                  <TableRow key={p.id} className="border-white/5 transition-colors hover:bg-white/[0.04] group">
+                    <TableCell className="font-medium text-white px-6 py-4 text-base">{p.name}</TableCell>
+                    <TableCell className="text-white/80 font-mono">v{p.currentVersion}</TableCell>
+                    <TableCell className="text-white font-mono">${p.salePrice.toLocaleString()}</TableCell>
+                    <TableCell className="text-white font-mono">${p.costPrice.toLocaleString()}</TableCell>
                     <TableCell><StatusBadge status={p.status} /></TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{p.createdAt}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="sm" onClick={() => setDetailProduct(p)}><Eye className="h-4 w-4" /></Button>
+                    <TableCell className="text-white/70 text-sm font-mono">{p.createdAt}</TableCell>
+                    <TableCell className="text-right pr-6 space-x-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:text-white hover:bg-white/10 rounded-lg transition-all" onClick={() => setDetailProduct(p)}><Eye className="h-4 w-4" /></Button>
                       {canEdit && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span>
-                              <Button variant="ghost" size="sm" disabled={p.status === 'ARCHIVED'} onClick={() => handleRaiseEco(p)}>
+                              <Button variant="ghost" size="icon" disabled={p.status === 'ARCHIVED'} onClick={() => handleRaiseEco(p)} className="h-8 w-8 text-white hover:text-white hover:bg-white/10 rounded-lg transition-all disabled:opacity-30">
                                 <GitPullRequest className="h-4 w-4" />
                               </Button>
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>{p.status === 'ARCHIVED' ? 'Cannot raise ECO for archived product' : 'Raise an ECO to modify this product'}</TooltipContent>
+                          <TooltipContent className="bg-popover border-white/10 text-white">{p.status === 'ARCHIVED' ? 'Cannot raise ECO for archived product' : 'Raise an ECO to modify this product'}</TooltipContent>
                         </Tooltip>
                       )}
                       {canArchive && p.status === 'ACTIVE' && (
-                        <Button variant="ghost" size="sm" onClick={() => setArchiveTarget(p.id)}><Archive className="h-4 w-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all" onClick={() => setArchiveTarget(p.id)}><Archive className="h-4 w-4" /></Button>
                       )}
                     </TableCell>
                   </TableRow>

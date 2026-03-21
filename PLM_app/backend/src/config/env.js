@@ -17,6 +17,10 @@ const isAllowedOrigin = (origin) => {
   if (!origin) return true;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
 
+  if (process.env.NODE_ENV === 'production') {
+    return false;
+  }
+
   try {
     const parsed = new URL(origin);
     const isHttp = parsed.protocol === 'http:' || parsed.protocol === 'https:';

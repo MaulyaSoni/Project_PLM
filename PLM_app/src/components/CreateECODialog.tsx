@@ -37,6 +37,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const [effectiveDate, setEffectiveDate] = useState('');
   const [versionUpdate, setVersionUpdate] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Product changes
   const [newSalePrice, setNewSalePrice] = useState('');
@@ -84,7 +85,31 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     setStep(1); setTitle(''); setType(''); setProductId(''); setBomId('');
     setEffectiveDate(''); setVersionUpdate(true); setConfirmed(false);
     setNewSalePrice(''); setNewCostPrice(''); setBomChanges([]);
+    setIsSubmitting(false);
   };
+
+  const isDirty =
+    step > 1 ||
+    !!title ||
+    !!type ||
+    !!productId ||
+    !!bomId ||
+    !!effectiveDate ||
+    !versionUpdate ||
+    !!newSalePrice ||
+    !!newCostPrice ||
+    bomChanges.length > 0;
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!open || !isDirty || isSubmitting) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [open, isDirty, isSubmitting]);
 
   const handleProductSelect = (pid: string) => {
     setProductId(pid);
@@ -103,6 +128,18 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
   const handleSubmit = async () => {
     if (!user || !type) return;
+    if (isSubmitting) return;
+
+    if (effectiveDate) {
+      const selected = new Date(effectiveDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selected < today) {
+        toast.warning('Effective date is in the past');
+      }
+    }
+
+    setIsSubmitting(true);
     let productChanges: ECOProductChange[] | undefined;
     let bomComponentChanges: ECOBOMComponentChange[] | undefined;
 
@@ -121,20 +158,34 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       }));
     }
 
-    const eco = await createECO({
-      title, type, productId, productName: selectedProduct?.name || '',
-      bomId: bomId || undefined, assignedTo: user.id, assignedToName: user.name,
-      effectiveDate, versionUpdate, createdBy: user.id, createdByName: user.name,
-      productChanges, bomComponentChanges,
-    });
-    toast.success('ECO created');
-    onOpenChange(false);
-    resetForm();
-    navigate(`/ecos/${eco.id}`);
+    try {
+      const eco = await createECO({
+        title, type, productId, productName: selectedProduct?.name || '',
+        bomId: bomId || undefined, assignedTo: user.id, assignedToName: user.name,
+        effectiveDate, versionUpdate, createdBy: user.id, createdByName: user.name,
+        productChanges, bomComponentChanges,
+      });
+      toast.success('ECO created');
+      onOpenChange(false);
+      resetForm();
+      navigate(`/ecos/${eco.id}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) resetForm(); onOpenChange(v); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && isDirty && !isSubmitting) {
+          const shouldClose = window.confirm('You have unsaved changes. Leave anyway?');
+          if (!shouldClose) return;
+        }
+        if (!v) resetForm();
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-display">Create Engineering Change Order</DialogTitle></DialogHeader>
 
@@ -309,7 +360,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
-              <Button onClick={handleSubmit} disabled={!confirmed}>Submit ECO</Button>
+              <Button onClick={handleSubmit} disabled={!confirmed || isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit ECO'}</Button>
             </div>
           </div>
         )}

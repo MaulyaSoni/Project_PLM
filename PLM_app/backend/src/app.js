@@ -15,17 +15,24 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 app.get('/', (_req, res) => {
   res.json({ message: 'PLM API running' });
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({ data: { status: 'ok' }, message: 'Service healthy' });
 });
 
 registerRoutes(app);
 
 app.use((err, _req, res, _next) => {
   const status = err.status || 500;
-  res.status(status).json({ error: err.message || 'Internal server error' });
+  const error = process.env.NODE_ENV === 'production' && status >= 500
+    ? 'Internal server error'
+    : (err.message || 'Internal server error');
+  res.status(status).json({ error });
 });
 
 module.exports = app;

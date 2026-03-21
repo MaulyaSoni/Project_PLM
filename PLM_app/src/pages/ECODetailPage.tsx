@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/EmptyState';
 
 const stages = ['NEW', 'IN_REVIEW', 'DONE'] as const;
 const stageLabels = { NEW: 'New', IN_REVIEW: 'In Review', DONE: 'Done' };
@@ -32,7 +33,17 @@ export default function ECODetailPage() {
 
   useEffect(() => { if (id) fetchECOById(id); }, [id, fetchECOById]);
 
-  if (isLoading || !currentECO) return <LoadingSpinner />;
+  if (isLoading) return <LoadingSpinner />;
+  if (!currentECO) {
+    return (
+      <div className="animate-fade-in">
+        <Button variant="ghost" onClick={() => navigate('/ecos')} className="mb-4">
+          <ChevronLeft className="h-4 w-4 mr-1" />Back to ECOs
+        </Button>
+        <EmptyState message="ECO not found" />
+      </div>
+    );
+  }
 
   const eco = currentECO;
   const canSubmit = eco.status === 'NEW' && (eco.createdBy === user?.id || user?.role === 'ADMIN');

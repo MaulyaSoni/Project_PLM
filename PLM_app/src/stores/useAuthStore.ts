@@ -37,10 +37,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
+    const token = localStorage.getItem('plm_token');
+    if (!token) {
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+      return;
+    }
+
     try {
       set({ isLoading: true });
       const user = await authService.getMe();
-      set({ user, isAuthenticated: true, isLoading: false });
+      set({ user, token, isAuthenticated: true, isLoading: false });
     } catch {
       localStorage.removeItem('plm_token');
       set({ user: null, token: null, isAuthenticated: false, isLoading: false });

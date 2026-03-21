@@ -3,6 +3,16 @@ const jwt = require('jsonwebtoken');
 const { prisma } = require('../lib/prisma');
 const { JWT_SECRET } = require('../config/env');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ALLOWED_ROLES = ['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS'];
+
+const serverError = (res, error) => {
+  const message = process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (error.message || 'Internal server error');
+  return res.status(500).json({ error: message });
+};
+
 const sanitizeUser = (user) => ({
   id: user.id,
   name: user.name,
@@ -18,74 +28,83 @@ const signToken = (user) => {
   );
 };
 
-const normalizeDbUser = (user) => ({
-  id: user.id,
-  name: user.name,
-  email: user.email,
-  role: user.role,
-  passwordHash: user.passwordHash || user.password,
-});
-
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'name, email and password are required' });
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedName || normalizedName.length < 2) {
+      return res.status(400).json({ error: 'Name must be at least 2 characters' });
+    }
+    if (normalizedName.length > 255) return res.status(400).json({ error: 'Name must be at most 255 characters' });
+    if (!EMAIL_REGEX.test(normalizedEmail)) return res.status(400).json({ error: 'Please enter a valid email address' });
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    let existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) return res.status(400).json({ error: 'Email already registered' });
+    const requestedRole = role || 'ENGINEERING';
+    if (!ALLOWED_ROLES.includes(requestedRole)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing) return res.status(409).json({ error: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 10);
-    let user = await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: normalizedName,
+        email: normalizedEmail,
         password: hashed,
-        role: role || 'ENGINEERING',
+        role: requestedRole,
       },
     });
 
     const token = signToken(user);
-    return res.status(201).json({ token, user: sanitizeUser(user) });
+    return res.status(201).json({
+      data: { token, user: sanitizeUser(user) },
+      message: 'User registered successfully',
+    });
   } catch (error) {
-    console.error('register error', error);
-    return res.status(503).json({ error: 'Database unavailable. Check Supabase connection.' });
+    if (error.code === 'P2002') return res.status(409).json({ error: 'Email already registered' });
+    return serverError(res, error);
   }
 };
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
     if (!email || !password) {
       return res.status(400).json({ error: 'email and password are required' });
     }
+    if (!EMAIL_REGEX.test(email)) return res.status(401).json({ error: 'Invalid credentials' });
 
-    let user = await prisma.user.findUnique({ where: { email } });
-    
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const normalized = normalizeDbUser(user);
-    const valid = await bcrypt.compare(password, normalized.passwordHash || '');
+    const valid = await bcrypt.compare(password, user.password || '');
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = signToken(normalized);
-    return res.json({ token, user: sanitizeUser(normalized) });
+    const token = signToken(user);
+    return res.json({
+      data: { token, user: sanitizeUser(user) },
+      message: 'Login successful',
+    });
   } catch (error) {
-    console.error('login error', error);
-    return res.status(503).json({ error: 'Database unavailable. Check Supabase connection.' });
+    return serverError(res, error);
   }
 };
 
 const getMe = async (req, res) => {
   try {
-    let user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    return res.json(sanitizeUser(user));
+    return res.json({ data: sanitizeUser(user) });
   } catch (error) {
-    console.error('getMe error', error);
-    return res.status(503).json({ error: 'Database unavailable. Check Supabase connection.' });
+    return serverError(res, error);
   }
 };
 

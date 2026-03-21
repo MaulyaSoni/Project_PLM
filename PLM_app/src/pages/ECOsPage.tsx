@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +18,7 @@ import { toast } from 'sonner';
 import CreateECODialog from '@/components/CreateECODialog';
 
 export default function ECOsPage() {
-  const { ecos, isLoading, fetchECOs } = useECOStore();
+  const { ecos, isLoading, fetchECOs, deleteECO } = useECOStore();
   const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -37,9 +38,11 @@ export default function ECOsPage() {
     return true;
   });
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteECO(deleteTarget);
     setDeleteTarget(null);
-    toast.success('ECO deleted successfully within Forge Node.');
+    toast.success('ECO deleted successfully.');
   };
 
   if (isLoading) return <LoadingSpinner />;
@@ -106,7 +109,12 @@ export default function ECOsPage() {
         <CardContent className="p-0">
           {filtered.length === 0 ? (
             <div className="py-24">
-              <EmptyState message="No change directives found matching your criteria." icon={GitPullRequest} />
+              <EmptyState
+                message="No ECOs found. Create your first ECO."
+                icon={GitPullRequest}
+                actionLabel={canCreate ? 'Create ECO' : undefined}
+                onAction={canCreate ? () => setCreateOpen(true) : undefined}
+              />
             </div>
           ) : (
             <Table>
@@ -144,6 +152,9 @@ export default function ECOsPage() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-all">
                           <Pencil className="h-4 w-4" />
                         </Button>
+                      )}
+                      {eco.status !== 'NEW' && (
+                        <Badge variant="outline" className="text-xs">Locked</Badge>
                       )}
                       {canDelete && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all" onClick={() => setDeleteTarget(eco.id)}>
