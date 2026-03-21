@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useECOStore } from '@/stores/useECOStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useProductStore } from '@/stores/useProductStore';
+import { useBOMStore } from '@/stores/useBOMStore';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TypeBadge } from '@/components/TypeBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -22,6 +24,8 @@ export default function ECODetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentECO, isLoading, fetchECOById, updateECOStage } = useECOStore();
+  const { fetchProducts } = useProductStore();
+  const { fetchBOMs } = useBOMStore();
   const { user } = useAuthStore();
   const [comment, setComment] = useState('');
   const [applyConfirm, setApplyConfirm] = useState(false);
@@ -39,6 +43,9 @@ export default function ECODetailPage() {
 
   const handleAction = async (action: 'submit' | 'approve' | 'reject' | 'apply') => {
     await updateECOStage(eco.id, action, comment, user?.id, user?.name);
+    if (action === 'apply') {
+      await Promise.all([fetchProducts(), fetchBOMs()]);
+    }
     setComment('');
     const msgs = { submit: 'Submitted for review', approve: 'ECO approved', reject: 'ECO rejected', apply: 'ECO applied successfully' };
     toast.success(msgs[action]);
@@ -105,8 +112,8 @@ export default function ECODetailPage() {
                 <Table>
                   <TableHeader><TableRow className="border-border hover:bg-transparent"><TableHead>Field</TableHead><TableHead>Old Value</TableHead><TableHead>New Value</TableHead><TableHead>Change</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {eco.productChanges.map(c => (
-                      <TableRow key={c.field} className="border-border">
+                    {eco.productChanges.map((c, idx) => (
+                      <TableRow key={c.field + '-' + idx} className="border-border">
                         <TableCell className="font-medium">{c.field}</TableCell>
                         <TableCell className="text-muted-foreground">${c.oldValue.toLocaleString()}</TableCell>
                         <TableCell className={c.newValue > c.oldValue ? 'text-success' : c.newValue < c.oldValue ? 'text-destructive' : 'text-muted-foreground'}>
@@ -132,8 +139,8 @@ export default function ECODetailPage() {
                 <Table>
                   <TableHeader><TableRow className="border-border hover:bg-transparent"><TableHead>Component</TableHead><TableHead>Old Qty</TableHead><TableHead>New Qty</TableHead><TableHead>Change</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {eco.bomComponentChanges.map(c => (
-                      <TableRow key={c.componentName} className={cn('border-border', c.changeType === 'ADDED' && 'bg-success/5', c.changeType === 'REMOVED' && 'bg-destructive/5')}>
+                    {eco.bomComponentChanges.map((c, idx) => (
+                      <TableRow key={c.componentName + '-' + idx} className={cn('border-border', c.changeType === 'ADDED' && 'bg-success/5', c.changeType === 'REMOVED' && 'bg-destructive/5')}>
                         <TableCell className="font-medium">{c.componentName}</TableCell>
                         <TableCell>{c.changeType === 'ADDED' ? '—' : c.changeType === 'CHANGED' ? <span className="line-through text-destructive">{c.oldQty}</span> : c.oldQty}</TableCell>
                         <TableCell>{c.changeType === 'REMOVED' ? '—' : c.changeType === 'CHANGED' ? <span className="text-success font-medium">{c.newQty}</span> : c.newQty}</TableCell>
@@ -205,8 +212,8 @@ export default function ECODetailPage() {
                 <p className="text-sm text-muted-foreground">No approvals yet</p>
               ) : (
                 <div className="space-y-3">
-                  {eco.approvals.map(a => (
-                    <div key={a.id} className="flex items-start gap-3">
+                  {eco.approvals.map((a, idx) => (
+                    <div key={a.id || idx} className="flex items-start gap-3">
                       <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
                         {a.userName.split(' ').map(n => n[0]).join('')}
                       </div>
@@ -230,10 +237,10 @@ export default function ECODetailPage() {
             <CardHeader className="pb-3"><CardTitle className="text-base">Audit Log</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {eco.auditLog.slice(0, 10).reverse().map(entry => {
+                {eco.auditLog.slice(0, 10).reverse().map((entry, idx) => {
                   const colors = { CREATE: 'text-primary', UPDATE: 'text-warning', APPROVE: 'text-success', REJECT: 'text-destructive', ARCHIVE: 'text-muted-foreground' };
                   return (
-                    <div key={entry.id} className="flex items-start gap-3 text-sm">
+                    <div key={entry.id || idx} className="flex items-start gap-3 text-sm">
                       <div className={cn('h-2 w-2 rounded-full mt-1.5 shrink-0', colors[entry.actionType]?.replace('text-', 'bg-'))} />
                       <div>
                         <p>{entry.action}</p>

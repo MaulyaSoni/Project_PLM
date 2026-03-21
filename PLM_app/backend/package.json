@@ -4,7 +4,7 @@
   "private": true,
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "kill-port 5000 && nodemon server.js",
     "start": "node server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -21,6 +21,7 @@
     "prisma": "^6.6.0"
   },
   "devDependencies": {
+    "kill-port": "^2.0.1",
     "nodemon": "^3.1.10"
   },
   "prisma": {

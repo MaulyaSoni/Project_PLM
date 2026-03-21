@@ -24,9 +24,26 @@ export default function DashboardPage() {
   const { boms, fetchBOMs } = useBOMStore();
 
   useEffect(() => {
-    fetchProducts();
-    fetchECOs();
-    fetchBOMs();
+    const refresh = () => {
+      void Promise.all([fetchProducts(), fetchECOs(), fetchBOMs()]);
+    };
+
+    refresh();
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const onFocus = () => refresh();
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    const timer = window.setInterval(refresh, 15000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(timer);
+    };
   }, [fetchProducts, fetchECOs, fetchBOMs]);
 
   const stats = {

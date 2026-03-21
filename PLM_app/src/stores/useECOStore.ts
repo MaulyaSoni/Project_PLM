@@ -19,14 +19,24 @@ export const useECOStore = create<ECOState>((set) => ({
 
   fetchECOs: async () => {
     set({ isLoading: true });
-    const ecos = await ecoService.getAll();
-    set({ ecos, isLoading: false });
+    try {
+      const ecos = await ecoService.getAll();
+      set({ ecos, isLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch ECOs:', error);
+      set({ isLoading: false });
+    }
   },
 
   fetchECOById: async (id) => {
     set({ isLoading: true });
-    const eco = await ecoService.getById(id);
-    set({ currentECO: eco || null, isLoading: false });
+    try {
+      const eco = await ecoService.getById(id);
+      set({ currentECO: eco || null, isLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch ECO details:', error);
+      set({ isLoading: false });
+    }
   },
 
   createECO: async (data) => {

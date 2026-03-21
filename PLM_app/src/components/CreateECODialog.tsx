@@ -51,7 +51,13 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const { user } = useAuthStore();
   const navigate = useNavigate();
 
-  useEffect(() => { fetchProducts(); fetchBOMs(); }, [fetchProducts, fetchBOMs]);
+  // Only fetch when dialog opens, and only if data isn't already loaded — prevents infinite loop
+  // caused by Zustand store functions being recreated on every render causing the deps to always change
+  useEffect(() => {
+    if (!open) return;
+    if (products.length === 0) fetchProducts();
+    if (boms.length === 0) fetchBOMs();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -267,7 +273,10 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
             <Card className="bg-muted/50 border-border">
               <CardContent className="p-4 space-y-2">
                 <p className="text-sm"><span className="text-muted-foreground">Title:</span> {title}</p>
-                <p className="text-sm"><span className="text-muted-foreground">Type:</span> <Badge variant="outline">{type}</Badge></p>
+                <div className="text-sm flex items-center gap-2">
+                  <span className="text-muted-foreground">Type:</span>
+                  <Badge variant="outline">{type}</Badge>
+                </div>
                 <p className="text-sm"><span className="text-muted-foreground">Product:</span> {selectedProduct?.name}</p>
                 <p className="text-sm"><span className="text-muted-foreground">Effective:</span> {effectiveDate}</p>
                 {type === 'PRODUCT' && (
@@ -279,14 +288,14 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 {type === 'BOM' && bomChanges.filter(c => c.changeType !== 'UNCHANGED').length > 0 && (
                   <div className="mt-3 space-y-1">
                     {bomChanges.filter(c => c.changeType !== 'UNCHANGED').map((c, i) => (
-                      <p key={i} className="text-sm">
+                      <div key={i} className="text-sm flex items-center gap-2">
                         <Badge variant="outline" className={cn('text-xs mr-2',
                           c.changeType === 'ADDED' && 'bg-success/15 text-success',
                           c.changeType === 'REMOVED' && 'bg-destructive/15 text-destructive',
                           c.changeType === 'CHANGED' && 'bg-warning/15 text-warning'
                         )}>{c.changeType}</Badge>
                         {c.name} {c.changeType === 'CHANGED' && `(${c.oldQty} → ${c.newQty})`}
-                      </p>
+                      </div>
                     ))}
                   </div>
                 )}
