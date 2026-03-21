@@ -175,10 +175,25 @@ const createECO = async (req, res) => {
         bomComponentChanges: bomComponentChanges || null,
         auditLogs: {
           create: isAdmin ? [
-            { userId: createdBy, action: 'ECO Created', actionType: 'CREATE' },
-            { userId: createdBy, action: 'Auto-approved by System (Admin Rules)', actionType: 'APPROVE', newValue: 'Bypassed standard review pipeline' }
+            {
+              userId: createdBy,
+              action: `ECO '${normalizedTitle}' created (${type}) by ${req.user.email}`,
+              actionType: 'CREATE',
+              newValue: JSON.stringify({ type, productId, bomId: actualBomId || null }),
+            },
+            {
+              userId: createdBy,
+              action: `'${normalizedTitle}' approved by ${req.user.email}. Comment: System auto-approval via Admin privileges`,
+              actionType: 'APPROVE',
+              newValue: 'System auto-approval via Admin privileges',
+            }
           ] : [
-            { userId: createdBy, action: 'ECO Created', actionType: 'CREATE' },
+            {
+              userId: createdBy,
+              action: `ECO '${normalizedTitle}' created (${type}) by ${req.user.email}`,
+              actionType: 'CREATE',
+              newValue: JSON.stringify({ type, productId, bomId: actualBomId || null }),
+            },
           ],
         },
         approvals: isAdmin ? {
@@ -216,8 +231,10 @@ const submitForReview = async (req, res) => {
         data: {
           ecoId: id,
           userId: req.user.id,
-          action: 'Moved to In Review',
+          action: `'${eco.title}' submitted for review by ${req.user.email}`,
           actionType: 'UPDATE',
+          oldValue: JSON.stringify({ status: eco.status }),
+          newValue: JSON.stringify({ status: 'IN_REVIEW' }),
         },
       }),
     ]);
@@ -259,9 +276,10 @@ const approveECO = async (req, res) => {
         data: {
           ecoId: id,
           userId: req.user.id,
-          action: 'Approved ECO',
+          action: `'${eco.title}' approved by ${req.user.email}. Comment: ${comment || 'No comment'}`,
           actionType: 'APPROVE',
-          newValue: comment || null,
+          oldValue: JSON.stringify({ status: eco.status }),
+          newValue: JSON.stringify({ status: 'APPROVED', comment: comment || null }),
         },
       }),
     ]);
@@ -304,9 +322,10 @@ const rejectECO = async (req, res) => {
         data: {
           ecoId: id,
           userId: req.user.id,
-          action: 'Rejected ECO',
+          action: `'${eco.title}' rejected by ${req.user.email}. Reason: ${comment || 'No reason given'}`,
           actionType: 'REJECT',
-          newValue: comment || null,
+          oldValue: JSON.stringify({ status: eco.status }),
+          newValue: JSON.stringify({ status: 'NEW', comment: comment || null }),
         },
       }),
     ]);
@@ -470,8 +489,10 @@ const applyECO = async (req, res) => {
         data: {
           ecoId: id,
           userId: req.user.id,
-          action: 'Applied ECO and created next version',
+          action: `'${eco.title}' applied. ${eco.type === 'PRODUCT' ? 'Product' : 'BOM'} update committed`,
           actionType: 'UPDATE',
+          oldValue: JSON.stringify({ status: 'APPROVED' }),
+          newValue: JSON.stringify({ status: 'DONE' }),
         },
       });
     }, { isolationLevel: 'Serializable' });
@@ -517,6 +538,17 @@ const updateECO = async (req, res) => {
       include: includeShape,
     });
 
+    await prisma.auditLog.create({
+      data: {
+        ecoId: id,
+        userId: req.user.id,
+        action: `ECO '${updated.title}' updated by ${req.user.email}`,
+        actionType: 'UPDATE',
+        oldValue: JSON.stringify({ title: eco.title, effectiveDate: eco.effectiveDate }),
+        newValue: JSON.stringify({ title: updated.title, effectiveDate: updated.effectiveDate }),
+      },
+    });
+
     return res.json({ data: mapECO(updated), message: 'ECO updated successfully' });
   } catch (error) {
     return serverError(res, error);
@@ -532,7 +564,19 @@ const deleteECO = async (req, res) => {
       return res.status(400).json({ error: 'Applied ECOs cannot be deleted — audit trail required' });
     }
 
-    await prisma.eCO.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.auditLog.create({
+        data: {
+          ecoId: id,
+          userId: req.user.id,
+          action: `ECO '${eco.title}' deleted by ${req.user.email}`,
+          actionType: 'UPDATE',
+          oldValue: JSON.stringify({ status: eco.status }),
+          newValue: 'Deleted',
+        },
+      }),
+      prisma.eCO.delete({ where: { id } }),
+    ]);
     return res.json({ data: { id }, message: 'ECO deleted successfully' });
   } catch (error) {
     return serverError(res, error);

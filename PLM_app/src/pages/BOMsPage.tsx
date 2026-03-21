@@ -39,6 +39,7 @@ export default function BOMsPage() {
   const [operations, setOperations] = useState<{ name: string; duration: string; workCenter: string }[]>([{ name: '', duration: '', workCenter: '' }]);
 
   const canEdit = user?.role === 'ADMIN' || user?.role === 'ENGINEERING';
+  const canRaiseEco = user?.role === 'ENGINEERING';
   const canArchive = user?.role === 'ADMIN';
 
   useEffect(() => { fetchBOMs(); fetchProducts(); }, [fetchBOMs, fetchProducts]);
@@ -163,7 +164,7 @@ export default function BOMsPage() {
                     <TableCell className="text-foreground/70 text-sm font-mono">{b.createdAt}</TableCell>
                     <TableCell className="text-right pr-6 space-x-2">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all" onClick={() => setDetailBOM(b)}><Eye className="h-4 w-4" /></Button>
-                      {canEdit && <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all disabled:opacity-30" disabled={b.status === 'ARCHIVED'} onClick={() => handleRaiseEco(b)}><GitPullRequest className="h-4 w-4" /></Button>}
+                      {canRaiseEco && <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all disabled:opacity-30" disabled={b.status === 'ARCHIVED'} onClick={() => handleRaiseEco(b)}><GitPullRequest className="h-4 w-4" /></Button>}
                       {canArchive && b.status === 'ACTIVE' && <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all" onClick={() => setArchiveTarget(b.id)}><Archive className="h-4 w-4" /></Button>}
                     </TableCell>
                   </TableRow>

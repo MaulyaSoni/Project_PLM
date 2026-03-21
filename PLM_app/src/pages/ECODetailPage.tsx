@@ -13,10 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft, Package, Layers, ArrowRight } from 'lucide-react';
+import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft, Package, Layers, ArrowRight, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
+import CreateECODialog from '@/components/CreateECODialog';
 
 const stages = ['NEW', 'IN_REVIEW', 'DONE'] as const;
 const stageLabels = { NEW: 'New', IN_REVIEW: 'In Review', DONE: 'Done' };
@@ -30,6 +31,7 @@ export default function ECODetailPage() {
   const { user } = useAuthStore();
   const [comment, setComment] = useState('');
   const [applyConfirm, setApplyConfirm] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,9 +50,10 @@ export default function ECODetailPage() {
   }
 
   const eco = currentECO;
-  const canSubmit = eco.status === 'NEW' && (eco.createdBy === user?.id || user?.role === 'ADMIN');
+  const canSubmit = eco.status === 'NEW' && user?.role === 'ENGINEERING';
+  const canEdit = eco.status === 'NEW' && user?.role === 'ENGINEERING';
   const canApprove = eco.status === 'IN_REVIEW' && (user?.role === 'APPROVER' || user?.role === 'ADMIN');
-  const canApply = eco.status === 'APPROVED' && (user?.role === 'ADMIN' || user?.role === 'ENGINEERING');
+  const canApply = eco.status === 'APPROVED' && user?.role === 'ADMIN';
 
   const stageIndex = stages.indexOf(eco.stage);
 
@@ -88,7 +91,14 @@ export default function ECODetailPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-2">Created by {eco.createdByName} on {eco.createdAt}</p>
             </div>
-            {eco.versionUpdate && <Badge variant="outline" className="bg-success/10 text-success border-success/30">Creates New Version</Badge>}
+            <div className="flex items-center gap-2">
+              {eco.versionUpdate && <Badge variant="outline" className="bg-success/10 text-success border-success/30">Creates New Version</Badge>}
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4 mr-1" />Edit ECO
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -376,6 +386,16 @@ export default function ECODetailPage() {
       </div>
 
       <ConfirmDialog open={applyConfirm} onOpenChange={setApplyConfirm} title="Apply ECO" description="This will create a new version and archive the current one. This cannot be undone." confirmLabel="Apply" onConfirm={() => { handleAction('apply'); setApplyConfirm(false); }} />
+      {editOpen && (
+        <CreateECODialog
+          open={editOpen}
+          onOpenChange={(next) => {
+            setEditOpen(next);
+            if (!next && id) fetchECOById(id);
+          }}
+          eco={currentECO}
+        />
+      )}
     </div>
   );
 }

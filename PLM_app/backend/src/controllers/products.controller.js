@@ -8,9 +8,11 @@ const serverError = (res, error) => {
   return res.status(500).json({ error: message });
 };
 
-const getAllProducts = async (_req, res) => {
+const getAllProducts = async (req, res) => {
   try {
+    const where = req.user?.role === 'OPERATIONS' ? { status: 'ACTIVE' } : undefined;
     const products = await prisma.product.findMany({
+      where,
       include: { versions: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -30,6 +32,9 @@ const getProductById = async (req, res) => {
     });
 
     if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (req.user?.role === 'OPERATIONS' && product.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     return res.json({ data: mapProduct(product) });
   } catch (error) {
     return serverError(res, error);
@@ -65,6 +70,16 @@ const createProduct = async (req, res) => {
       include: { versions: true },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: `Product '${name}' created with v1 at ${salePrice}`,
+        actionType: 'CREATE',
+        oldValue: null,
+        newValue: JSON.stringify({ productId: product.id, version: 1, salePrice, costPrice }),
+      },
+    });
+
     return res.status(201).json({ data: mapProduct(product), message: 'Product created successfully' });
   } catch (error) {
     return serverError(res, error);
@@ -95,6 +110,15 @@ const archiveProduct = async (req, res) => {
     await prisma.$transaction([
       prisma.product.update({ where: { id }, data: { status: 'ARCHIVED' } }),
       prisma.productVersion.updateMany({ where: { productId: id, status: 'ACTIVE' }, data: { status: 'ARCHIVED' } }),
+      prisma.auditLog.create({
+        data: {
+          userId: req.user.id,
+          action: `Product '${product.name}' archived by ${req.user.email}`,
+          actionType: 'ARCHIVE',
+          oldValue: JSON.stringify({ status: product.status }),
+          newValue: JSON.stringify({ status: 'ARCHIVED' }),
+        },
+      }),
     ]);
 
     return res.json({ data: { id }, message: 'Product archived successfully' });

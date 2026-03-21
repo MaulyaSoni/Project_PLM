@@ -3,6 +3,7 @@ const productsRoutes = require('./products.routes');
 const bomRoutes = require('./bom.routes');
 const ecoRoutes = require('./eco.routes');
 const reportsRoutes = require('./reports.routes');
+const settingsRoutes = require('./settings.routes');
 
 const registerRoutes = (app) => {
   app.use('/api/auth', authRoutes);
@@ -11,6 +12,7 @@ const registerRoutes = (app) => {
   app.use('/api/eco', ecoRoutes);
   app.use('/api/ecos', ecoRoutes);
   app.use('/api/reports', reportsRoutes);
+  app.use('/api/settings', settingsRoutes);
 };
 
 module.exports = { registerRoutes };

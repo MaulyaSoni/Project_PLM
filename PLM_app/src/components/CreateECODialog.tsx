@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Layers, ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { ECOType, ECOProductChange, ECOBOMComponentChange } from '@/data/mockData';
+import type { ECO, ECOType, ECOProductChange, ECOBOMComponentChange } from '@/data/mockData';
 import { useEffect } from 'react';
 
 interface Props {
@@ -26,9 +26,11 @@ interface Props {
   initialProductId?: string;
   initialBOMId?: string;
   initialTitle?: string;
+  /** When provided, the dialog operates in edit mode, pre-filling fields from the ECO. */
+  eco?: ECO;
 }
 
-export default function CreateECODialog({ open, onOpenChange, initialType, initialProductId, initialBOMId, initialTitle }: Props) {
+export default function CreateECODialog({ open, onOpenChange, initialType, initialProductId, initialBOMId, initialTitle, eco: editEco }: Props) {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ECOType | ''>('');
@@ -46,7 +48,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   // BOM changes
   const [bomChanges, setBomChanges] = useState<{ name: string; oldQty: string; newQty: string; changeType: string }[]>([]);
 
-  const { createECO } = useECOStore();
+  const { createECO, updateECO } = useECOStore();
   const { products, fetchProducts } = useProductStore();
   const { boms, fetchBOMs } = useBOMStore();
   const { user } = useAuthStore();
@@ -63,6 +65,31 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   useEffect(() => {
     if (!open) return;
 
+    // Edit mode: pre-fill all fields from existing ECO
+    if (editEco) {
+      setTitle(editEco.title);
+      setType(editEco.type);
+      setProductId(editEco.productId);
+      if (editEco.bomId) setBomId(editEco.bomId);
+      setEffectiveDate(editEco.effectiveDate);
+      setVersionUpdate(editEco.versionUpdate);
+      if (editEco.type === 'PRODUCT' && editEco.productChanges) {
+        const saleChange = editEco.productChanges.find(c => c.field === 'Sale Price');
+        const costChange = editEco.productChanges.find(c => c.field === 'Cost Price');
+        if (saleChange) setNewSalePrice(String(saleChange.newValue));
+        if (costChange) setNewCostPrice(String(costChange.newValue));
+      }
+      if (editEco.type === 'BOM' && editEco.bomComponentChanges) {
+        setBomChanges(editEco.bomComponentChanges.map(c => ({
+          name: c.componentName,
+          oldQty: c.oldQty !== null ? String(c.oldQty) : '0',
+          newQty: c.newQty !== null ? String(c.newQty) : '',
+          changeType: c.changeType,
+        })));
+      }
+      return;
+    }
+
     if (initialType) setType(initialType);
     if (initialTitle) setTitle(initialTitle);
 
@@ -75,7 +102,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       handleBOMSelect(initialBOMId);
       setBomId(initialBOMId);
     }
-  }, [open, initialType, initialProductId, initialBOMId, initialTitle]);
+  }, [open, initialType, initialProductId, initialBOMId, initialTitle, editEco]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedProduct = products.find(p => p.id === productId);
   const selectedBOM = boms.find(b => b.id === bomId);
@@ -163,16 +190,25 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     }
 
     try {
-      const eco = await createECO({
-        title, type, productId, productName: selectedProduct?.name || '',
-        bomId: bomId || undefined, assignedTo: user.id, assignedToName: user.name,
-        effectiveDate, versionUpdate, createdBy: user.id, createdByName: user.name,
-        productChanges, bomComponentChanges,
-      });
-      toast.success('ECO created');
-      onOpenChange(false);
-      resetForm();
-      navigate(`/ecos/${eco.id}`);
+      if (editEco) {
+        await updateECO(editEco.id, {
+          title, effectiveDate, versionUpdate, productChanges, bomComponentChanges,
+        });
+        toast.success('ECO updated');
+        onOpenChange(false);
+        resetForm();
+      } else {
+        const eco = await createECO({
+          title, type, productId, productName: selectedProduct?.name || '',
+          bomId: bomId || undefined, assignedTo: user.id, assignedToName: user.name,
+          effectiveDate, versionUpdate, createdBy: user.id, createdByName: user.name,
+          productChanges, bomComponentChanges,
+        });
+        toast.success('ECO created');
+        onOpenChange(false);
+        resetForm();
+        navigate(`/ecos/${eco.id}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -191,7 +227,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       }}
     >
       <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="font-display">Create Engineering Change Order</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display">{editEco ? 'Edit Engineering Change Order' : 'Create Engineering Change Order'}</DialogTitle></DialogHeader>
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-4">
@@ -368,7 +404,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
-              <Button onClick={handleSubmit} disabled={!confirmed || isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit ECO'}</Button>
+              <Button onClick={handleSubmit} disabled={!confirmed || isSubmitting}>{isSubmitting ? 'Saving...' : (editEco ? 'Save Changes' : 'Submit ECO')}</Button>
             </div>
           </div>
         )}

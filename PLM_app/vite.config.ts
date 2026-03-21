@@ -12,10 +12,18 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  optimizeDeps: {
+    include: ["@tanstack/react-query", "@tanstack/query-core"],
+  },
+  ssr: {
+    noExternal: ["@tanstack/react-query", "@tanstack/query-core"],
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@tanstack/react-query": path.resolve(__dirname, "./node_modules/@tanstack/react-query/src/index.ts"),
+      "@tanstack/query-core": path.resolve(__dirname, "./node_modules/@tanstack/query-core/src/index.ts"),
     },
   },
 }));

@@ -17,11 +17,11 @@ const router = express.Router();
 
 router.get('/', authenticate, getAllECOs);
 router.get('/:id', authenticate, getECOById);
-router.post('/', authenticate, authorize([ROLES.ADMIN, ROLES.ENGINEERING]), createECO);
-router.patch('/:id', authenticate, authorize([ROLES.ADMIN, ROLES.ENGINEERING]), updateECO);
+router.post('/', authenticate, authorize([ROLES.ENGINEERING]), createECO);
+router.patch('/:id', authenticate, authorize([ROLES.ENGINEERING]), updateECO);
 router.delete('/:id', authenticate, authorize([ROLES.ADMIN], 'Only admins can delete ECOs'), deleteECO);
 
-router.post('/:id/submit', authenticate, authorize([ROLES.ADMIN, ROLES.ENGINEERING]), submitForReview);
+router.post('/:id/submit', authenticate, authorize([ROLES.ENGINEERING]), submitForReview);
 
 router.post('/:id/approve', authenticate, authorize([ROLES.ADMIN, ROLES.APPROVER]), approveECO);
 router.patch('/:id/approve', authenticate, authorize([ROLES.ADMIN, ROLES.APPROVER]), approveECO);
@@ -29,7 +29,7 @@ router.patch('/:id/approve', authenticate, authorize([ROLES.ADMIN, ROLES.APPROVE
 router.post('/:id/reject', authenticate, authorize([ROLES.ADMIN, ROLES.APPROVER]), rejectECO);
 router.patch('/:id/reject', authenticate, authorize([ROLES.ADMIN, ROLES.APPROVER]), rejectECO);
 
-router.post('/:id/apply', authenticate, authorize([ROLES.ADMIN, ROLES.ENGINEERING]), applyECO);
-router.patch('/:id/apply', authenticate, authorize([ROLES.ADMIN, ROLES.ENGINEERING]), applyECO);
+router.post('/:id/apply', authenticate, authorize([ROLES.ADMIN]), applyECO);
+router.patch('/:id/apply', authenticate, authorize([ROLES.ADMIN]), applyECO);
 
 module.exports = router;

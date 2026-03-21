@@ -37,13 +37,13 @@ function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/403" element={<ForbiddenPage />} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/boms" element={<BOMsPage />} />
-          <Route path="/ecos" element={<ECOsPage />} />
-          <Route path="/ecos/create" element={<RoleRoute roles={['ADMIN', 'ENGINEERING']}><ECOCreatePage /></RoleRoute>} />
-          <Route path="/ecos/:id" element={<ECODetailPage />} />
-          <Route path="/reports" element={<RoleRoute roles={['ADMIN', 'APPROVER']}><ReportsPage /></RoleRoute>} />
+          <Route path="/dashboard" element={<RoleRoute roles={['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS']}><DashboardPage /></RoleRoute>} />
+          <Route path="/products" element={<RoleRoute roles={['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS']}><ProductsPage /></RoleRoute>} />
+          <Route path="/boms" element={<RoleRoute roles={['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS']}><BOMsPage /></RoleRoute>} />
+          <Route path="/ecos" element={<RoleRoute roles={['ADMIN', 'ENGINEERING', 'APPROVER']} message="Operations users have read-only access to Products and BOMs."><ECOsPage /></RoleRoute>} />
+          <Route path="/ecos/create" element={<RoleRoute roles={['ENGINEERING']}><ECOCreatePage /></RoleRoute>} />
+          <Route path="/ecos/:id" element={<RoleRoute roles={['ADMIN', 'ENGINEERING', 'APPROVER']} message="Operations users have read-only access to Products and BOMs."><ECODetailPage /></RoleRoute>} />
+          <Route path="/reports" element={<RoleRoute roles={['ADMIN']} message="Admin access required to view reports."><ReportsPage /></RoleRoute>} />
           <Route path="/settings" element={<RoleRoute roles={['ADMIN']} message="Admin access required"><SettingsPage /></RoleRoute>} />
         </Route>
         <Route path="*" element={<NotFound />} />

@@ -5,18 +5,49 @@ import { Package, Layers, GitPullRequest, Clock, Activity, Zap } from 'lucide-re
 import { useProductStore } from '@/stores/useProductStore';
 import { useECOStore } from '@/stores/useECOStore';
 import { useBOMStore } from '@/stores/useBOMStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TypeBadge } from '@/components/TypeBadge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+type ShortcutDef = { label: string; to: string; Icon: React.ElementType; color: string };
+
+const roleShortcuts: Record<string, ShortcutDef[]> = {
+  ENGINEERING: [
+    { label: 'Initialize Product Matrix', to: '/products', Icon: Package, color: 'text-primary' },
+    { label: 'Construct BOM', to: '/boms', Icon: Layers, color: 'text-secondary' },
+    { label: 'Draft Change Order', to: '/ecos/create', Icon: GitPullRequest, color: 'text-warning' },
+  ],
+  APPROVER: [
+    { label: 'Review Products', to: '/products', Icon: Package, color: 'text-primary' },
+    { label: 'Review BOMs', to: '/boms', Icon: Layers, color: 'text-secondary' },
+    { label: 'Review Change Orders', to: '/ecos', Icon: GitPullRequest, color: 'text-warning' },
+  ],
+  ADMIN: [
+    { label: 'Manage Products', to: '/products', Icon: Package, color: 'text-primary' },
+    { label: 'Manage BOMs', to: '/boms', Icon: Layers, color: 'text-secondary' },
+    { label: 'View Change Orders', to: '/ecos', Icon: GitPullRequest, color: 'text-warning' },
+  ],
+  OPERATIONS: [
+    { label: 'View Active Products', to: '/products', Icon: Package, color: 'text-primary' },
+    { label: 'View Active BOMs', to: '/boms', Icon: Layers, color: 'text-secondary' },
+  ],
+};
+
 export default function DashboardPage() {
   const { products, fetchProducts } = useProductStore();
   const { ecos, fetchECOs } = useECOStore();
   const { boms, fetchBOMs } = useBOMStore();
+  const { user } = useAuthStore();
+  const isOperations = user?.role === 'OPERATIONS';
 
   useEffect(() => {
-    const refresh = () => { void Promise.all([fetchProducts(), fetchECOs(), fetchBOMs()]); };
+    const refresh = () => {
+      const requests = [fetchProducts(), fetchBOMs()];
+      if (!isOperations) requests.push(fetchECOs());
+      void Promise.all(requests);
+    };
     refresh();
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
     const onFocus = () => refresh();
@@ -28,7 +59,7 @@ export default function DashboardPage() {
       window.removeEventListener('focus', onFocus);
       window.clearInterval(timer);
     };
-  }, [fetchProducts, fetchECOs, fetchBOMs]);
+  }, [fetchProducts, fetchECOs, fetchBOMs, isOperations]);
 
   const stats = {
     products: products.length,
@@ -37,12 +68,15 @@ export default function DashboardPage() {
     pending: ecos.filter(e => e.status === 'IN_REVIEW').length,
   };
 
-  const statCards = [
+  let statCards = [
     { label: 'Total Products', icon: Package, color: 'text-primary', glow: 'shadow-[0_0_30px_-5px_rgba(0,242,255,0.4)]', bg: 'bg-primary/10', border: 'border-primary/20', key: 'products' },
     { label: 'Active BOMs', icon: Layers, color: 'text-success', glow: 'shadow-[0_0_30px_-5px_rgba(34,197,94,0.4)]', bg: 'bg-success/10', border: 'border-success/20', key: 'boms' },
     { label: 'Open ECOs', icon: GitPullRequest, color: 'text-warning', glow: 'shadow-[0_0_30px_-5px_rgba(234,179,8,0.4)]', bg: 'bg-warning/10', border: 'border-warning/20', key: 'openEcos' },
     { label: 'Pending Approvals', icon: Clock, color: 'text-destructive', glow: 'shadow-[0_0_30px_-5px_rgba(239,68,68,0.4)]', bg: 'bg-destructive/10', border: 'border-destructive/20', key: 'pending' },
   ];
+  if (user?.role === 'OPERATIONS') {
+    statCards = statCards.filter(c => c.key === 'products' || c.key === 'boms');
+  }
 
   return (
     <div className="animate-fade-in text-foreground pb-12">
@@ -64,11 +98,13 @@ export default function DashboardPage() {
               Real-time telemetry and management logic for your Product Lifecycle infrastructure.
             </p>
           </div>
-          <div className="flex gap-3">
-            <Button asChild className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_20px_-5px_rgba(0,242,255,0.5)] border-0 h-11 px-6">
-              <Link to="/ecos"><GitPullRequest className="mr-2 h-4 w-4" /> Raise ECO</Link>
-            </Button>
-          </div>
+          {user?.role === 'ENGINEERING' && (
+            <div className="flex gap-3">
+              <Button asChild className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_20px_-5px_rgba(0,242,255,0.5)] border-0 h-11 px-6">
+                <Link to="/ecos/create"><GitPullRequest className="mr-2 h-4 w-4" /> Raise ECO</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -93,10 +129,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Asymmetric Core Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`grid grid-cols-1 gap-8 ${isOperations ? 'lg:grid-cols-1' : 'lg:grid-cols-3'}`}>
 
         {/* Recent ECOs - Takes 2 columns */}
-        <div className="lg:col-span-2">
+        {!isOperations && <div className="lg:col-span-2">
           <Card className="bg-card/40 backdrop-blur-xl border border-foreground/5 shadow-xl h-full flex flex-col">
             <div className="p-6 border-b border-foreground/5 flex items-center justify-between bg-foreground/[0.02]">
               <div className="flex items-center gap-3">
@@ -135,7 +171,7 @@ export default function DashboardPage() {
               </Table>
             </CardContent>
           </Card>
-        </div>
+        </div>}
 
         {/* Quick Links & Operations - Takes 1 column */}
         <div className="space-y-6 flex flex-col">
@@ -145,15 +181,11 @@ export default function DashboardPage() {
               <h3 className="font-display font-bold text-lg text-foreground">Execution Shortcuts</h3>
             </div>
             <CardContent className="p-6 space-y-3 relative z-10">
-              <Button asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
-                <Link to="/products"><Package className="h-5 w-5 mr-3 text-primary group-hover:scale-110 transition-transform" /> Initialize Product Matrix</Link>
-              </Button>
-              <Button asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
-                <Link to="/boms"><Layers className="h-5 w-5 mr-3 text-secondary group-hover:scale-110 transition-transform" /> Construct BOM</Link>
-              </Button>
-              <Button asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
-                <Link to="/ecos"><GitPullRequest className="h-5 w-5 mr-3 text-warning group-hover:scale-110 transition-transform" /> Draft Change Order</Link>
-              </Button>
+              {(roleShortcuts[user?.role ?? ''] ?? roleShortcuts['ADMIN']).map(({ label, to, Icon, color }) => (
+                <Button key={label} asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
+                  <Link to={to}><Icon className={`h-5 w-5 mr-3 ${color} group-hover:scale-110 transition-transform`} /> {label}</Link>
+                </Button>
+              ))}
             </CardContent>
           </Card>
 

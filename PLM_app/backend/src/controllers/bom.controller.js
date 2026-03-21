@@ -8,9 +8,11 @@ const serverError = (res, error) => {
   return res.status(500).json({ error: message });
 };
 
-const getAllBOMs = async (_req, res) => {
+const getAllBOMs = async (req, res) => {
   try {
+    const where = req.user?.role === 'OPERATIONS' ? { status: 'ACTIVE' } : undefined;
     const boms = await prisma.bOM.findMany({
+      where,
       include: {
         product: true,
         components: true,
@@ -38,6 +40,9 @@ const getBOMById = async (req, res) => {
     });
 
     if (!bom) return res.status(404).json({ error: 'BOM not found' });
+    if (req.user?.role === 'OPERATIONS' && bom.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'BOM not found' });
+    }
     return res.json({ data: mapBOM(bom) });
   } catch (error) {
     return serverError(res, error);
@@ -106,6 +111,16 @@ const createBOM = async (req, res) => {
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: `BOM v${bom.version} created for '${product.name}' by ${req.user.email}`,
+        actionType: 'CREATE',
+        oldValue: null,
+        newValue: JSON.stringify({ bomId: bom.id, productId, version: bom.version }),
+      },
+    });
+
     return res.status(201).json({ data: mapBOM(bom), message: 'BOM created successfully' });
   } catch (error) {
     return serverError(res, error);
@@ -133,7 +148,18 @@ const archiveBOM = async (req, res) => {
       });
     }
 
-    await prisma.bOM.update({ where: { id }, data: { status: 'ARCHIVED' } });
+    await prisma.$transaction([
+      prisma.bOM.update({ where: { id }, data: { status: 'ARCHIVED' } }),
+      prisma.auditLog.create({
+        data: {
+          userId: req.user.id,
+          action: `BOM v${bom.version} archived for product ${bom.productId} by ${req.user.email}`,
+          actionType: 'ARCHIVE',
+          oldValue: JSON.stringify({ status: bom.status }),
+          newValue: JSON.stringify({ status: 'ARCHIVED' }),
+        },
+      }),
+    ]);
     return res.json({ data: { id }, message: 'BOM archived successfully' });
   } catch (error) {
     return serverError(res, error);

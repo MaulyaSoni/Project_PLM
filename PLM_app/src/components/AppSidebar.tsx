@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils';
 import type { Role } from '@/data/mockData';
 
 const navItems: { label: string; path: string; icon: React.ElementType; roles?: Role[] }[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Products', path: '/products', icon: Package },
-  { label: 'Bills of Materials', path: '/boms', icon: Layers },
-  { label: 'Change Orders', path: '/ecos', icon: GitPullRequest },
-  { label: 'Reports', path: '/reports', icon: BarChart3, roles: ['ADMIN', 'APPROVER'] },
+  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS'] },
+  { label: 'Products', path: '/products', icon: Package, roles: ['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS'] },
+  { label: 'Bills of Materials', path: '/boms', icon: Layers, roles: ['ADMIN', 'ENGINEERING', 'APPROVER', 'OPERATIONS'] },
+  { label: 'Change Orders', path: '/ecos', icon: GitPullRequest, roles: ['ADMIN', 'ENGINEERING', 'APPROVER'] },
+  { label: 'Reports', path: '/reports', icon: BarChart3, roles: ['ADMIN'] },
   { label: 'Settings', path: '/settings', icon: Settings, roles: ['ADMIN'] },
 ];
 

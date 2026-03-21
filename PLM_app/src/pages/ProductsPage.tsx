@@ -32,6 +32,7 @@ export default function ProductsPage() {
   const [ecoProductId, setEcoProductId] = useState<string>('');
 
   const canEdit = user?.role === 'ADMIN' || user?.role === 'ENGINEERING';
+  const canRaiseEco = user?.role === 'ENGINEERING';
   const canArchive = user?.role === 'ADMIN';
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
@@ -169,13 +170,13 @@ export default function ProductsPage() {
                   <TableRow key={p.id} className="border-foreground/5 transition-colors hover:bg-foreground/[0.04] group">
                     <TableCell className="font-medium text-foreground px-6 py-4 text-base">{p.name}</TableCell>
                     <TableCell className="text-foreground/80 font-mono">v{p.currentVersion}</TableCell>
-                    <TableCell className="text-foreground font-mono">${p.salePrice.toLocaleString()}</TableCell>
-                    <TableCell className="text-foreground font-mono">${p.costPrice.toLocaleString()}</TableCell>
+                    <TableCell className="text-foreground font-mono" title={canRaiseEco ? 'Raise an ECO to modify prices' : undefined}>${p.salePrice.toLocaleString()}</TableCell>
+                    <TableCell className="text-foreground font-mono" title={canRaiseEco ? 'Raise an ECO to modify prices' : undefined}>${p.costPrice.toLocaleString()}</TableCell>
                     <TableCell><StatusBadge status={p.status} /></TableCell>
                     <TableCell className="text-foreground/70 text-sm font-mono">{p.createdAt}</TableCell>
                     <TableCell className="text-right pr-6 space-x-2">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all" onClick={() => setDetailProduct(p)}><Eye className="h-4 w-4" /></Button>
-                      {canEdit && (
+                      {canRaiseEco && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span>
@@ -242,7 +243,7 @@ export default function ProductsPage() {
                   ))}
                 </TableBody>
               </Table>
-              {canEdit && detailProduct.status !== 'ARCHIVED' && (
+              {canRaiseEco && detailProduct.status !== 'ARCHIVED' && (
                 <div className="mt-4">
                   <Button className="w-full" onClick={() => handleRaiseEco(detailProduct)}>
                     <GitPullRequest className="h-4 w-4 mr-2" />Raise ECO for this Product

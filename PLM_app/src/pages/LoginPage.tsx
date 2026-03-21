@@ -21,8 +21,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      const loggedInUser = useAuthStore.getState().user;
       toast.success('Logged in successfully');
-      navigate('/dashboard');
+      navigate(loggedInUser?.role === 'OPERATIONS' ? '/products' : '/dashboard');
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error || 'Login failed')

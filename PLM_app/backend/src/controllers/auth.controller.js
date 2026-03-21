@@ -108,8 +108,34 @@ const getMe = async (req, res) => {
   }
 };
 
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { role },
+    });
+
+    return res.json({
+      data: sanitizeUser(user),
+      message: 'User role updated successfully',
+    });
+  } catch (error) {
+    return serverError(res, error);
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
+  updateUserRole,
 };

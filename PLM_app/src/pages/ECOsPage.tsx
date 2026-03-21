@@ -25,8 +25,9 @@ export default function ECOsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<string | null>(null);
 
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'ENGINEERING';
+  const canCreate = user?.role === 'ENGINEERING';
   const canDelete = user?.role === 'ADMIN';
 
   useEffect(() => { fetchECOs(); }, [fetchECOs]);
@@ -148,8 +149,8 @@ export default function ECOsPage() {
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all" asChild>
                         <Link to={`/ecos/${eco.id}`}><Eye className="h-4 w-4" /></Link>
                       </Button>
-                      {eco.status === 'NEW' && eco.createdBy === user?.id && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all">
+                      {eco.status === 'NEW' && user?.role === 'ENGINEERING' && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all" onClick={() => setEditTarget(eco.id)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
@@ -171,6 +172,13 @@ export default function ECOsPage() {
       </Card>
 
       {createOpen && <CreateECODialog open={createOpen} onOpenChange={setCreateOpen} />}
+      {editTarget && (
+        <CreateECODialog
+          open={!!editTarget}
+          onOpenChange={(next) => { if (!next) setEditTarget(null); }}
+          eco={ecos.find(e => e.id === editTarget)}
+        />
+      )}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={() => setDeleteTarget(null)}
