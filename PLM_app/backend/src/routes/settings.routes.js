@@ -5,12 +5,38 @@ const { authorize, ROLES } = require('../middleware/roles');
 
 const router = express.Router();
 
-router.get('/stages', authenticate, authorize([ROLES.ADMIN]), async (_req, res) => {
+router.get('/stages', authenticate, async (_req, res) => {
   try {
     const stages = await prisma.eCOStage.findMany({
       orderBy: { order: 'asc' },
     });
     return res.json({ data: stages, total: stages.length });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+router.post('/stages', authenticate, authorize([ROLES.ADMIN]), async (req, res) => {
+  try {
+    const { name, requiresApproval, order } = req.body;
+    
+    // Fallback if order not provided: get max order
+    let newOrder = order;
+    if (newOrder === undefined) {
+      const maxStage = await prisma.eCOStage.findFirst({
+        orderBy: { order: 'desc' },
+      });
+      newOrder = maxStage ? maxStage.order + 1 : 1;
+    }
+
+    const stage = await prisma.eCOStage.create({
+      data: {
+        name: String(name).trim(),
+        requiresApproval: Boolean(requiresApproval),
+        order: Number(newOrder),
+      },
+    });
+    return res.status(201).json({ data: stage, message: 'Stage created successfully' });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }

@@ -20,6 +20,10 @@ export const settingsService = {
     const { data } = await api.get('/settings/stages');
     return data.data;
   },
+  async createStage(payload: Partial<Pick<StageItem, 'name' | 'order' | 'requiresApproval'>>) {
+    const { data } = await api.post('/settings/stages', payload);
+    return data.data;
+  },
   async updateStage(id: string, payload: Partial<Pick<StageItem, 'name' | 'order' | 'requiresApproval'>>) {
     const { data } = await api.patch(`/settings/stages/${id}`, payload);
     return data.data;

@@ -4,6 +4,7 @@ import { useECOStore } from '@/stores/useECOStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProductStore } from '@/stores/useProductStore';
 import { useBOMStore } from '@/stores/useBOMStore';
+import { settingsService, type StageItem } from '@/services/settings.service';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TypeBadge } from '@/components/TypeBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -19,8 +20,8 @@ import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import CreateECODialog from '@/components/CreateECODialog';
 
-const stages = ['NEW', 'IN_REVIEW', 'DONE'] as const;
-const stageLabels = { NEW: 'New', IN_REVIEW: 'In Review', DONE: 'Done' };
+const legacyStages = ['NEW', 'IN_REVIEW', 'DONE'] as const;
+const defaultStageLabels: Record<string, string> = { NEW: 'New', IN_REVIEW: 'In Review', DONE: 'Done' };
 
 export default function ECODetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,9 +34,13 @@ export default function ECODetailPage() {
   const [applyConfirm, setApplyConfirm] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [dynamicStages, setDynamicStages] = useState<StageItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { if (id) fetchECOById(id); }, [id, fetchECOById]);
+  useEffect(() => {
+    if (id) fetchECOById(id);
+    settingsService.getStages().then(setDynamicStages).catch(console.error);
+  }, [id, fetchECOById]);
 
   if (isLoading) return <LoadingSpinner />;
   if (!currentECO) {
@@ -55,7 +60,8 @@ export default function ECODetailPage() {
   const canApprove = eco.status === 'IN_REVIEW' && (user?.role === 'APPROVER' || user?.role === 'ADMIN');
   const canApply = eco.status === 'APPROVED' && user?.role === 'ADMIN';
 
-  const stageIndex = stages.indexOf(eco.stage);
+  const stagesList = dynamicStages.length > 0 ? dynamicStages.map(s => s.name.toUpperCase().replace(/ /g, '_')) : legacyStages;
+  const stageIndex = Math.max(0, stagesList.indexOf(eco.stage));
 
   const handleAction = async (action: 'submit' | 'approve' | 'reject' | 'apply') => {
     await updateECOStage(eco.id, action, comment, user?.id, user?.name);
@@ -104,22 +110,30 @@ export default function ECODetailPage() {
       </Card>
 
       {/* Stage Progress */}
-      <div className="flex items-center justify-center mb-6 gap-0">
-        {stages.map((stage, i) => {
+      <div className="flex items-center justify-center mb-6 gap-0 overflow-x-auto pb-4">
+        {stagesList.map((stage, i) => {
           const isCompleted = i < stageIndex;
           const isCurrent = i === stageIndex;
+          
+          let displayLabel = stage;
+          if (dynamicStages.length > 0) {
+            displayLabel = dynamicStages[i]?.name || stage;
+          } else {
+            displayLabel = defaultStageLabels[stage] || stage.replace(/_/g, ' ');
+          }
+
           return (
             <div key={stage} className="flex items-center">
               <div className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border',
+                'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border whitespace-nowrap',
                 isCompleted && 'bg-success/15 text-success border-success/30',
                 isCurrent && 'bg-primary/15 text-primary border-primary/30',
                 !isCompleted && !isCurrent && 'bg-muted/40 text-muted-foreground border-border'
               )}>
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-                {stageLabels[stage]}
+                {displayLabel}
               </div>
-              {i < stages.length - 1 && <div className={cn('w-12 h-0.5 mx-1', isCompleted ? 'bg-success' : 'bg-border')} />}
+              {i < stagesList.length - 1 && <div className={cn('w-12 h-0.5 mx-1 shrink-0', isCompleted ? 'bg-success' : 'bg-border')} />}
             </div>
           );
         })}

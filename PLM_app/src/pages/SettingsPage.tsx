@@ -21,6 +21,9 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [editingStage, setEditingStage] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [addStageOpen, setAddStageOpen] = useState(false);
+  const [newStageName, setNewStageName] = useState('');
+  const [newStageApproval, setNewStageApproval] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('ENGINEERING');
@@ -67,6 +70,26 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAddStage = async () => {
+    const name = newStageName.trim();
+    if (!name) return;
+    try {
+      const highestOrder = stages.reduce((max, s) => Math.max(max, s.order), 0);
+      const newStage = await settingsService.createStage({
+        name,
+        requiresApproval: newStageApproval,
+        order: highestOrder + 1,
+      });
+      setStages((prev) => [...prev, newStage].sort((a, b) => a.order - b.order));
+      toast.success('Stage added successfully');
+      setAddStageOpen(false);
+      setNewStageName('');
+      setNewStageApproval(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to add stage');
+    }
+  };
+
   const handleRoleChange = async (id: string, role: Role) => {
     try {
       if (id === user?.id) {
@@ -90,7 +113,7 @@ export default function SettingsPage() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">ECO Stages</CardTitle>
-            <Button variant="outline" size="sm"><Plus className="h-3 w-3 mr-1" />Add Stage</Button>
+            <Button variant="outline" size="sm" onClick={() => setAddStageOpen(true)}><Plus className="h-3 w-3 mr-1" />Add Stage</Button>
           </CardHeader>
           <CardContent>
             <Table>
@@ -191,6 +214,25 @@ export default function SettingsPage() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
               <Button onClick={handleInvite} disabled={!inviteEmail}>Send Invite</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={addStageOpen} onOpenChange={setAddStageOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle>Add ECO Stage</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Stage Name</Label>
+              <Input value={newStageName} onChange={e => setNewStageName(e.target.value)} className="bg-muted border-border" placeholder="e.g. Quality Check" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch checked={newStageApproval} onCheckedChange={setNewStageApproval} id="require-approval" />
+              <Label htmlFor="require-approval">Requires Approval</Label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAddStageOpen(false)}>Cancel</Button>
+              <Button onClick={handleAddStage} disabled={!newStageName.trim()}>Add Stage</Button>
             </div>
           </div>
         </DialogContent>

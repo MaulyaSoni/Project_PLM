@@ -515,7 +515,7 @@ const applyECO = async (req, res) => {
 const updateECO = async (req, res) => {
   try {
     const id = req.params.id;
-    const { title, effectiveDate, productChanges, bomComponentChanges } = req.body;
+    const { title, effectiveDate, versionUpdate, productChanges, bomComponentChanges } = req.body;
 
     const eco = await prisma.eCO.findUnique({ where: { id } });
     if (!eco) return res.status(404).json({ error: 'ECO not found' });
@@ -532,6 +532,7 @@ const updateECO = async (req, res) => {
       data: {
         title: normalizedTitle,
         effectiveDate: effectiveDate ? new Date(effectiveDate) : eco.effectiveDate,
+        versionUpdate: versionUpdate !== undefined ? versionUpdate : eco.versionUpdate,
         productChanges: productChanges ?? eco.productChanges,
         bomComponentChanges: bomComponentChanges ?? eco.bomComponentChanges,
       },
