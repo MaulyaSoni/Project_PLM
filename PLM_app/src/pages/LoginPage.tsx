@@ -22,12 +22,12 @@ export default function LoginPage() {
     try {
       await login(email, password);
       const loggedInUser = useAuthStore.getState().user;
-      toast.success('Logged in successfully');
+      toast.success('Access Granted 👋');
       navigate(loggedInUser?.role === 'OPERATIONS' ? '/products' : '/dashboard');
     } catch (error) {
       const message = axios.isAxiosError(error)
-        ? (error.response?.data?.error || 'Login failed')
-        : 'Login failed';
+        ? (error.response?.data?.error || 'Access Denied')
+        : 'Access Denied';
       toast.error(message);
     } finally {
       setLoading(false);
@@ -35,33 +35,64 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-sm bg-card border-border animate-fade-in">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
-            <Cog className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-xl font-display">PLM Control</CardTitle>
-          <p className="text-sm text-muted-foreground">Sign in to your account</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#050514] font-sans relative overflow-hidden">
+      {/* Soft Cyber Glowing Orbs Background */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full mix-blend-screen filter blur-[120px] opacity-70 animate-pulse" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-[#FF00FF]/20 rounded-full mix-blend-screen filter blur-[140px] opacity-60" />
+
+      <Card className="z-10 w-full max-w-[460px] bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[28px] shadow-[0_30px_60px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] overflow-hidden">
+        {/* Soft edge glowing cyan line inside */}
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+        <CardHeader className="text-center pt-12 pb-6 space-y-3">
+          <CardTitle className="text-4xl font-extrabold text-white tracking-tight flex flex-col items-center justify-center gap-2 drop-shadow-md">
+            PLM_CONTROL
+            <div className="w-12 h-1.5 bg-gradient-to-r from-primary to-[#FF00FF] rounded-full mt-2 opacity-80" />
+          </CardTitle>
+          <p className="text-[15px] text-white/60 font-medium">
+            Authentication Required
+          </p>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="bg-muted border-border" />
+
+        <CardContent className="px-10 pb-12">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-1.5 relative group">
+              <Label className="text-white/70 font-semibold px-1">Email Space</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="hello@plmcontrol.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="bg-black/20 border border-white/10 text-white placeholder:text-white/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-white/20 rounded-[16px] px-4 py-6 shadow-inner transition-all hover:bg-black/30 text-base"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="bg-muted border-border" />
+            <div className="space-y-1.5 relative group">
+              <Label className="text-white/70 font-semibold px-1">Passkey</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="bg-black/20 border border-white/10 text-white placeholder:text-white/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-white/20 rounded-[16px] px-4 py-6 shadow-inner transition-all hover:bg-black/30 text-base"
+              />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-primary to-[#FF00FF] text-white border-0 hover:opacity-90 rounded-[16px] transition-all duration-300 shadow-[0_10px_20px_rgba(0,212,255,0.3)] hover:shadow-[0_15px_30px_rgba(255,0,255,0.4)] font-bold text-lg tracking-wide mt-8 h-14"
+              disabled={loading}
+            >
+              {loading ? 'Authenticating...' : 'Enter System'}
             </Button>
           </form>
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-primary hover:underline">Register</Link>
-          </p>
+
+          <div className="mt-8 border-t border-white/10 pt-6 text-center">
+            <p className="text-sm text-white/40 font-medium">
+              Secure Connection Established
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

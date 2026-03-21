@@ -177,16 +177,28 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader><TableRow className="border-border hover:bg-transparent"><TableHead>Version</TableHead><TableHead>Sale Price</TableHead><TableHead>Cost Price</TableHead><TableHead>Status</TableHead><TableHead>Created Via</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {versions.map(v => (
-                      <TableRow key={v.version} className={`border-border ${v.status === 'ACTIVE' ? 'bg-success/5' : ''}`}>
-                        <TableCell>v{v.version}</TableCell>
-                        <TableCell>${v.salePrice}</TableCell>
-                        <TableCell>${v.costPrice}</TableCell>
-                        <TableCell><StatusBadge status={v.status} /></TableCell>
-                        <TableCell className="text-muted-foreground">{v.createdVia || '—'}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{v.createdAt}</TableCell>
-                      </TableRow>
-                    ))}
+                    {[...versions].sort((a, b) => a.version - b.version).map((v, i, arr) => {
+                      const prev = i > 0 ? arr[i - 1] : null;
+                      const salePriceChanged = prev && v.salePrice !== prev.salePrice;
+                      const salePriceIncreased = prev && v.salePrice > prev.salePrice;
+                      const costPriceChanged = prev && v.costPrice !== prev.costPrice;
+                      const costPriceIncreased = prev && v.costPrice > prev.costPrice;
+
+                      return (
+                        <TableRow key={v.version} className={`border-border ${v.status === 'ACTIVE' ? 'bg-success/5' : ''}`}>
+                          <TableCell>v{v.version}</TableCell>
+                          <TableCell className={salePriceChanged ? (salePriceIncreased ? 'text-green-500 font-bold' : 'text-red-500 font-bold') : ''}>
+                            ${v.salePrice}
+                          </TableCell>
+                          <TableCell className={costPriceChanged ? (costPriceIncreased ? 'text-red-500 font-bold' : 'text-green-500 font-bold') : ''}>
+                            ${v.costPrice}
+                          </TableCell>
+                          <TableCell><StatusBadge status={v.status} /></TableCell>
+                          <TableCell className="text-muted-foreground">{v.createdVia || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{v.createdAt}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -271,8 +283,30 @@ export default function ReportsPage() {
                         <TableCell className="font-medium">{entry.action}</TableCell>
                         <TableCell><Badge variant="outline" className={actionColors[entry.actionType]}>{entry.actionType}</Badge></TableCell>
                         <TableCell className="text-muted-foreground">{entry.userName}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{entry.oldValue || '—'}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{entry.newValue || '—'}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-xs truncate" title={entry.oldValue}>
+                          {(() => {
+                            if (!entry.oldValue) return '—';
+                            try {
+                              const parsed = JSON.parse(entry.oldValue);
+                              if (typeof parsed === 'object' && parsed !== null) {
+                                return Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(', ');
+                              }
+                            } catch { /* empty */ }
+                            return entry.oldValue;
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-xs truncate" title={entry.newValue}>
+                          {(() => {
+                            if (!entry.newValue) return '—';
+                            try {
+                              const parsed = JSON.parse(entry.newValue);
+                              if (typeof parsed === 'object' && parsed !== null) {
+                                return Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(', ');
+                              }
+                            } catch { /* empty */ }
+                            return entry.newValue;
+                          })()}
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-sm">{new Date(entry.timestamp).toLocaleString()}</TableCell>
                       </TableRow>
                     ))}

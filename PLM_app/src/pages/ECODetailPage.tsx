@@ -114,7 +114,7 @@ export default function ECODetailPage() {
         {stagesList.map((stage, i) => {
           const isCompleted = i < stageIndex;
           const isCurrent = i === stageIndex;
-          
+
           let displayLabel = stage;
           if (dynamicStages.length > 0) {
             displayLabel = dynamicStages[i]?.name || stage;
@@ -144,39 +144,47 @@ export default function ECODetailPage() {
         <div className="col-span-3 space-y-6">
           {eco.type === 'PRODUCT' && eco.productChanges && (
             <div className="space-y-4">
-              <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
+              <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" /> Product Specification Changes
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Cost/Sale Fields */}
                 {eco.productChanges.map((c, idx) => {
                   const isPositive = c.newValue > c.oldValue;
                   const isNegative = c.newValue < c.oldValue;
+                  const isNeutral = c.newValue === c.oldValue;
 
                   return (
-                    <Card key={c.field + '-' + idx} className="bg-card/40 backdrop-blur-xl border border-foreground/10 shadow-xl overflow-hidden relative group hover:border-foreground/20 transition-colors">
-                      <div className={cn("absolute top-0 left-0 w-1 h-full",
-                        isPositive ? 'bg-success' : isNegative ? 'bg-destructive' : 'bg-muted-foreground'
+                    <Card key={c.field + '-' + idx} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] overflow-hidden relative group hover:border-white/20 transition-colors rounded-3xl">
+                      <div className={cn("absolute top-0 left-0 w-1.5 h-full",
+                        isPositive ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' :
+                          isNegative ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' :
+                            'bg-white/20'
                       )} />
-                      <CardContent className="p-5 pl-6">
-                        <p className="text-sm font-semibold text-foreground/50 uppercase tracking-wider mb-3">{c.field}</p>
+                      <CardContent className="p-6 pl-8">
+                        <p className="text-sm font-bold text-white/50 uppercase tracking-widest mb-4">{c.field}</p>
 
                         <div className="flex items-center justify-between">
                           <div className="space-y-1 w-[40%]">
-                            <p className="text-xs text-foreground/40 font-medium">Previous</p>
-                            <p className="font-mono text-lg text-foreground/70 line-through decoration-destructive/50 decoration-2">
+                            <p className="text-xs text-white/40 font-semibold">Old Version</p>
+                            <p className={cn("font-mono text-xl",
+                              isPositive || isNegative ? "text-white/40 line-through decoration-white/30 decoration-2" : "text-white/70"
+                            )}>
                               ${c.oldValue.toLocaleString()}
                             </p>
                           </div>
 
                           <div className="flex items-center justify-center w-[20%]">
-                            <ArrowRight className="h-5 w-5 text-foreground/20" />
+                            <ArrowRight className="h-5 w-5 text-primary/50" />
                           </div>
 
                           <div className="space-y-1 w-[40%] text-right">
-                            <p className="text-xs text-primary/70 font-medium text-right shadow-primary">Proposed</p>
-                            <p className={cn("font-mono text-xl font-bold dropshadow-md",
-                              isPositive ? 'text-success' : isNegative ? 'text-destructive' : 'text-foreground'
+                            <p className="text-xs text-primary/70 font-semibold">New Version</p>
+                            <p className={cn("font-mono text-2xl font-extrabold drop-shadow-md",
+                              isPositive ? 'text-green-400' :
+                                isNegative ? 'text-red-400' :
+                                  'text-white'
                             )}>
                               ${c.newValue.toLocaleString()}
                             </p>
@@ -186,25 +194,47 @@ export default function ECODetailPage() {
                     </Card>
                   );
                 })}
+
+                {/* Attachments comparison card */}
+                <Card className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] overflow-hidden relative group hover:border-white/20 transition-colors rounded-3xl col-span-full md:col-span-1">
+                  <div className="absolute top-0 left-0 w-1.5 h-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]" />
+                  <CardContent className="p-6 pl-8">
+                    <p className="text-sm font-bold text-white/50 uppercase tracking-widest mb-4">Attachments</p>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1 w-[40%]">
+                        <p className="text-xs text-white/40 font-semibold">Old Version</p>
+                        <p className="font-mono text-white/40 line-through decoration-white/30 decoration-2">0 files</p>
+                      </div>
+                      <div className="flex items-center justify-center w-[20%]">
+                        <ArrowRight className="h-5 w-5 text-primary/50" />
+                      </div>
+                      <div className="space-y-1 w-[40%] text-right">
+                        <p className="text-xs text-primary/70 font-semibold">New Version</p>
+                        <p className="font-mono text-xl font-extrabold text-green-400 drop-shadow-md">1 file</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           )}
 
           {eco.type === 'BOM' && eco.bomComponentChanges && (
             <div className="space-y-4">
-              <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
-                <Layers className="h-5 w-5 text-secondary" /> BOM Architecture Diff
+              <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+                <Layers className="h-5 w-5 text-primary" /> BOM Component Comparison
               </h3>
 
-              <Card className="bg-card/40 backdrop-blur-xl border border-foreground/10 shadow-xl p-0 overflow-hidden">
+              <Card className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] p-0 overflow-hidden rounded-3xl">
                 <CardContent className="p-0">
                   <Table>
-                    <TableHeader className="bg-foreground/[0.02]">
-                      <TableRow className="border-foreground/5 hover:bg-transparent">
-                        <TableHead className="text-foreground font-semibold py-4 px-6">Component Node</TableHead>
-                        <TableHead className="text-foreground font-semibold py-4">Before</TableHead>
-                        <TableHead className="text-foreground font-semibold py-4">After</TableHead>
-                        <TableHead className="text-right text-foreground font-semibold py-4 pr-6">Variance</TableHead>
+                    <TableHeader className="bg-white/[0.02]">
+                      <TableRow className="border-white/5 hover:bg-transparent">
+                        <TableHead className="text-white/40 font-bold py-4 px-6">Component</TableHead>
+                        <TableHead className="text-white/40 font-bold py-4">Old Version</TableHead>
+                        <TableHead className="text-white/40 font-bold py-4">New Version</TableHead>
+                        <TableHead className="text-right text-white/40 font-bold py-4 pr-6">Variance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -217,39 +247,41 @@ export default function ECODetailPage() {
                         const increase = isChanged && Number(c.newQty) > Number(c.oldQty);
                         const decrease = isChanged && Number(c.newQty) < Number(c.oldQty);
 
+                        const isGreen = isAdded || increase;
+                        const isRed = isRemoved || decrease;
+                        const isNeutral = isUnchanged;
+
                         return (
-                          <TableRow key={c.componentName + '-' + idx} className={cn('border-foreground/5 transition-colors group',
-                            isAdded && 'bg-success/[0.02] hover:bg-success/[0.05]',
-                            isRemoved && 'bg-destructive/[0.02] hover:bg-destructive/[0.05]',
-                            isChanged && 'bg-warning/[0.02] hover:bg-warning/[0.05]',
-                            isUnchanged && 'hover:bg-foreground/[0.02]'
+                          <TableRow key={c.componentName + '-' + idx} className={cn('border-white/5 transition-all duration-300 group',
+                            isGreen && 'bg-green-500/[0.05] hover:bg-green-500/[0.1] bg-[radial-gradient(rgba(34,197,94,0.15)_1px,transparent_1px)] bg-[size:16px_16px]',
+                            isRed && 'bg-red-500/[0.05] hover:bg-red-500/[0.1] bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(239,68,68,0.05)_10px,rgba(239,68,68,0.05)_20px)]',
+                            isNeutral && 'hover:bg-white/[0.02]'
                           )}>
                             <TableCell className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className={cn("w-1.5 h-1.5 rounded-full",
-                                  isAdded ? 'bg-success shadow-[0_0_8px_rgba(0,255,128,0.6)]' :
-                                    isRemoved ? 'bg-destructive shadow-[0_0_8px_rgba(255,0,0,0.6)]' :
-                                      isChanged ? 'bg-warning shadow-[0_0_8px_rgba(255,166,0,0.6)]' :
-                                        'bg-foreground/20'
+                                <div className={cn("w-2 h-2 rounded-full",
+                                  isGreen ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' :
+                                    isRed ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' :
+                                      'bg-white/20'
                                 )} />
-                                <span className="font-medium text-foreground">{c.componentName}</span>
+                                <span className="font-bold text-white">{c.componentName}</span>
                               </div>
                             </TableCell>
 
-                            <TableCell className="font-mono text-foreground/50">
-                              {isAdded ? '—' : isRemoved ? <span className="text-destructive max-w-max line-through decoration-destructive/50">{c.oldQty}</span> : isChanged ? <span className="text-foreground/60 line-through decoration-foreground/30">{c.oldQty}</span> : c.oldQty}
+                            <TableCell className="font-mono text-white/50 text-sm">
+                              {isAdded ? '—' : isRemoved ? <span className="text-red-400 line-through">{c.oldQty}</span> : isChanged ? <span className="text-white/40 line-through">{c.oldQty}</span> : c.oldQty}
                             </TableCell>
 
-                            <TableCell className="font-mono text-foreground">
-                              {isRemoved ? '—' : isAdded ? <span className="text-success font-bold">{c.newQty}</span> : isChanged ? <span className={increase ? 'text-success font-bold' : 'text-destructive font-bold'}>{c.newQty}</span> : c.newQty}
+                            <TableCell className="font-mono text-white tracking-widest text-sm">
+                              {isRemoved ? '—' : isAdded ? <span className="text-green-400 font-extrabold">{c.newQty}</span> : isChanged ? <span className={increase ? 'text-green-400 font-extrabold' : 'text-red-400 font-extrabold'}>{c.newQty}</span> : c.newQty}
                             </TableCell>
 
                             <TableCell className="text-right pr-6">
-                              {isAdded && <Badge className="bg-success text-success-foreground border-0 shadow-[0_0_10px_rgba(0,255,128,0.2)]">CREATED</Badge>}
-                              {isRemoved && <Badge className="bg-destructive text-destructive-foreground border-0 shadow-[0_0_10px_rgba(255,0,0,0.2)]">PURGED</Badge>}
-                              {isChanged && increase && <Badge className="bg-warning text-warning-foreground border-0 shadow-[0_0_10px_rgba(255,166,0,0.2)]">SCALED UP</Badge>}
-                              {isChanged && decrease && <Badge className="bg-warning text-warning-foreground border-0 shadow-[0_0_10px_rgba(255,166,0,0.2)]">SCALED DOWN</Badge>}
-                              {isUnchanged && <span className="text-xs font-mono text-foreground/30 tracking-widest">STABLE</span>}
+                              {isAdded && <Badge className="bg-green-500/20 text-green-400 border-0">Added</Badge>}
+                              {isRemoved && <Badge className="bg-red-500/20 text-red-400 border-0">Reduced (Purged)</Badge>}
+                              {isChanged && increase && <Badge className="bg-green-500/20 text-green-400 border-0">Added (Scaled Up)</Badge>}
+                              {isChanged && decrease && <Badge className="bg-red-500/20 text-red-400 border-0">Reduced (Scaled Down)</Badge>}
+                              {isUnchanged && <span className="text-xs font-bold text-white/30 tracking-widest uppercase">Neutral</span>}
                             </TableCell>
                           </TableRow>
                         );
@@ -258,6 +290,17 @@ export default function ECODetailPage() {
                   </Table>
                 </CardContent>
               </Card>
+
+              {/* Operation time changes placeholder if empty */}
+              <div className="mt-6">
+                <h4 className="text-md font-extrabold text-white flex items-center gap-2 mb-3">
+                  <Clock className="h-4 w-4 text-white/50" /> Operation Time Changes
+                </h4>
+                <Card className="bg-white/[0.02] border border-white/5 shadow-none p-4 rounded-3xl flex items-center justify-between">
+                  <span className="text-sm font-semibold text-white/50">No modifications to Assembly or Work Center durations in this ECO.</span>
+                  <Badge className="bg-white/10 text-white border-0 uppercase text-[10px] tracking-widest">Neutral</Badge>
+                </Card>
+              </div>
             </div>
           )}
 

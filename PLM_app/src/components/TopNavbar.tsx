@@ -11,27 +11,39 @@ export function TopNavbar() {
   if (!user) return null;
 
   return (
-    <header className="h-14 border-b border-border bg-topbar flex items-center justify-end px-6 sticky top-0 z-20">
-      <div className="flex items-center gap-3">
+    <header className="h-16 border-b border-white/10 bg-white/[0.02] backdrop-blur-2xl flex items-center justify-between px-6 sticky top-0 z-20 font-sans shadow-[0_4px_20px_rgba(0,0,0,0.2)]">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
+          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-[#FF00FF] animate-pulse shadow-[0_0_10px_rgba(0,212,255,0.8)]" />
+          <span className="text-white text-xs font-bold tracking-wide uppercase">
+            Active
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={toggleTheme}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-9 w-9 text-white border-white/10 bg-white/5 hover:bg-white/10 hover:text-white rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.5)] transition-all duration-300"
             >
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>
-            {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          <TooltipContent className="bg-black/50 backdrop-blur-xl text-white border border-white/10 font-sans rounded-xl text-xs font-bold">
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </TooltipContent>
         </Tooltip>
-        <RoleBadge role={user.role} />
-        <span className="text-sm font-medium">{user.name}</span>
-        <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary">
-          {user.name.split(' ').map(n => n[0]).join('')}
+
+        <div className="flex items-center gap-2 border border-white/10 bg-white/5 px-4 py-1.5 rounded-full text-sm font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+          <span className="text-white/50">User</span>
+          <span className="text-white font-bold drop-shadow-sm">{user.name}</span>
+        </div>
+
+        <div className="opacity-90">
+          <RoleBadge role={user.role} />
         </div>
       </div>
     </header>
