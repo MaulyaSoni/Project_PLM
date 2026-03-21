@@ -44,11 +44,13 @@ export default function ReportsPage() {
   }, [selectedProduct]);
 
   return (
-    <div className="animate-fade-in">
-      <PageHeader title="Reports & Audit Trail" />
+    <div className="animate-fade-in print:bg-white print:text-black">
+      <div className="print:hidden">
+        <PageHeader title="Reports & Audit Trail" />
+      </div>
 
       <Tabs defaultValue="eco" className="space-y-4">
-        <TabsList className="bg-muted">
+        <TabsList className="bg-muted print:hidden">
           <TabsTrigger value="eco">ECO Report</TabsTrigger>
           <TabsTrigger value="product">Product Versions</TabsTrigger>
           <TabsTrigger value="bom">BOM History</TabsTrigger>
@@ -58,22 +60,22 @@ export default function ReportsPage() {
         <TabsContent value="eco">
           <Card className="bg-card border-border">
             <CardContent className="p-0">
-              <div className="flex items-center justify-between p-4 border-b border-border">
-                <h3 className="font-semibold">ECO Report</h3>
-                <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-2" />Export</Button>
+              <div className="flex items-center justify-between p-4 border-b border-border print:border-b-black">
+                <h3 className="font-semibold text-lg print:text-2xl print:mb-4">Engineering Change Orders Report</h3>
+                <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden"><Download className="h-4 w-4 mr-2" />Export PDF</Button>
               </div>
               {ecoReport.length === 0 ? <EmptyState message="No ECO data" icon={BarChart3} /> : (
-                <Table>
-                  <TableHeader><TableRow className="border-border hover:bg-transparent"><TableHead>Title</TableHead><TableHead>Type</TableHead><TableHead>Product</TableHead><TableHead>Stage</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                <Table className="print:w-full print:border-collapse">
+                  <TableHeader><TableRow className="border-border hover:bg-transparent print:border-b-2 print:border-black"><TableHead className="print:text-black">Title</TableHead><TableHead className="print:text-black">Type</TableHead><TableHead className="print:text-black">Product</TableHead><TableHead className="print:text-black">Stage</TableHead><TableHead className="print:text-black">Status</TableHead><TableHead className="print:text-black">Date</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {ecoReport.map(eco => (
-                      <TableRow key={eco.id} className="border-border">
-                        <TableCell className="font-medium">{eco.title}</TableCell>
-                        <TableCell><TypeBadge type={eco.type} /></TableCell>
-                        <TableCell className="text-muted-foreground">{eco.productName}</TableCell>
-                        <TableCell><StatusBadge status={eco.stage} /></TableCell>
-                        <TableCell><StatusBadge status={eco.status} /></TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{eco.createdAt}</TableCell>
+                      <TableRow key={eco.id} className="border-border print:border-b print:border-gray-300">
+                        <TableCell className="font-medium print:text-black">{eco.title}</TableCell>
+                        <TableCell className="print:text-black"><TypeBadge type={eco.type} /></TableCell>
+                        <TableCell className="text-muted-foreground print:text-black">{eco.productName}</TableCell>
+                        <TableCell className="print:text-black"><StatusBadge status={eco.stage} /></TableCell>
+                        <TableCell className="print:text-black"><StatusBadge status={eco.status} /></TableCell>
+                        <TableCell className="text-muted-foreground text-sm print:text-black">{eco.createdAt}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

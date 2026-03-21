@@ -120,6 +120,10 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
   const handleBOMSelect = (bid: string) => {
     setBomId(bid);
+    if (bid === 'NEW') {
+      setBomChanges([]);
+      return;
+    }
     const b = boms.find(x => x.id === bid);
     if (b) {
       setBomChanges(b.components.map(c => ({ name: c.name, oldQty: String(c.quantity), newQty: String(c.quantity), changeType: 'UNCHANGED' })));
@@ -240,7 +244,11 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 <Label>BOM</Label>
                 <Select value={bomId} onValueChange={handleBOMSelect}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Select BOM" /></SelectTrigger>
-                  <SelectContent>{filteredBOMs.map(b => <SelectItem key={b.id} value={b.id}>{b.productName} v{b.currentVersion}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {filteredBOMs.length === 0 && <SelectItem value="NEW">✨ Initialize New BOM</SelectItem>}
+                    {filteredBOMs.length > 0 && <SelectItem value="NEW">✨ Create Alterate BOM</SelectItem>}
+                    {filteredBOMs.map(b => <SelectItem key={b.id} value={b.id}>{b.productName} v{b.currentVersion}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
             )}

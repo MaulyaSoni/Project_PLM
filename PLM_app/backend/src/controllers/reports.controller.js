@@ -38,13 +38,24 @@ const getVersionHistory = async (req, res) => {
       orderBy: { version: 'asc' },
     });
 
+    const ecoIds = versions.map((v) => v.createdVia).filter(Boolean);
+    const ecos = await prisma.eCO.findMany({
+      where: { id: { in: ecoIds } },
+      include: { user: true },
+    });
+
+    const ecoCreatorMap = {};
+    ecos.forEach((eco) => {
+      ecoCreatorMap[eco.id] = eco.user.name;
+    });
+
     const data = versions.map((v) => ({
       version: v.version,
       salePrice: v.salePrice,
       costPrice: v.costPrice,
       status: v.status,
       createdAt: toDateOnly(v.createdAt),
-      createdVia: v.createdVia || undefined,
+      createdVia: ecoCreatorMap[v.createdVia] || v.createdVia || undefined,
     }));
 
     return res.json({ data, total: data.length });

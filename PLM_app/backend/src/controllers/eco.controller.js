@@ -91,7 +91,11 @@ const createECO = async (req, res) => {
     if (normalizedTitle.length > TITLE_MAX) return res.status(400).json({ error: 'title must be at most 255 characters' });
     if (!['PRODUCT', 'BOM'].includes(type)) return res.status(400).json({ error: 'Invalid ECO type' });
     if (!productId) return res.status(400).json({ error: 'productId is required' });
-    if (type === 'BOM' && !bomId) {
+
+    // If frontend sends 'NEW', they want to initialize a BOM via ECO
+    const actualBomId = bomId === 'NEW' ? null : bomId;
+
+    if (type === 'BOM' && !actualBomId && bomId !== 'NEW') {
       return res.status(400).json({ error: 'BOM selection is required for BOM type ECOs' });
     }
     if (!hasMeaningfulChanges(type, productChanges, bomComponentChanges)) {
@@ -136,8 +140,8 @@ const createECO = async (req, res) => {
     }
 
     let selectedBom = null;
-    if (type === 'BOM') {
-      selectedBom = await prisma.bOM.findUnique({ where: { id: bomId } });
+    if (type === 'BOM' && actualBomId) {
+      selectedBom = await prisma.bOM.findUnique({ where: { id: actualBomId } });
       if (!selectedBom) return res.status(404).json({ error: 'BOM not found' });
       if (selectedBom.productId !== productId) {
         return res.status(400).json({ error: 'BOM does not belong to the selected product' });
@@ -147,7 +151,9 @@ const createECO = async (req, res) => {
       }
     }
 
-    const stage = await findStageByStatus('NEW');
+    const isAdmin = req.user.role === 'ADMIN';
+    const initialStatus = isAdmin ? 'APPROVED' : 'NEW';
+    const stage = await findStageByStatus(initialStatus);
     const createdBy = req.user.id;
 
     const effective = effectiveDate ? new Date(effectiveDate) : null;
@@ -158,22 +164,30 @@ const createECO = async (req, res) => {
         title: normalizedTitle,
         type,
         productId,
-        bomId: type === 'BOM' ? bomId : null,
+        bomId: type === 'BOM' ? actualBomId : null,
         userId: createdBy,
         assignedToId: assignedTo || createdBy,
         effectiveDate: effective,
         versionUpdate: versionUpdate !== false,
         stageId: stage.id,
-        status: 'NEW',
+        status: initialStatus,
         productChanges: productChanges || null,
         bomComponentChanges: bomComponentChanges || null,
         auditLogs: {
-          create: {
-            userId: createdBy,
-            action: 'ECO Created',
-            actionType: 'CREATE',
-          },
+          create: isAdmin ? [
+            { userId: createdBy, action: 'ECO Created', actionType: 'CREATE' },
+            { userId: createdBy, action: 'Auto-approved by System (Admin Rules)', actionType: 'APPROVE', newValue: 'Bypassed standard review pipeline' }
+          ] : [
+            { userId: createdBy, action: 'ECO Created', actionType: 'CREATE' },
+          ],
         },
+        approvals: isAdmin ? {
+          create: [{
+            userId: createdBy,
+            approved: true,
+            comment: 'System auto-approval via Admin privileges'
+          }]
+        } : undefined,
       },
       include: includeShape,
     });
@@ -379,36 +393,51 @@ const applyECO = async (req, res) => {
         });
       }
 
-      if (eco.type === 'BOM' && eco.bomId) {
-        const currentBom = await tx.bOM.findUnique({
-          where: { id: eco.bomId },
-          include: { components: true, operations: true },
-        });
+      if (eco.type === 'BOM') {
+        const changes = Array.isArray(eco.bomComponentChanges) ? eco.bomComponentChanges : [];
+        let newVersion = 1;
+        let updatedComponents = [];
+        let updatedOperations = [];
+        let currentBomId = null;
 
-        if (!currentBom) throw new Error('Source BOM not found');
-        if (currentBom.status !== 'ACTIVE') {
-          throw new Error('Source BOM has been archived — ECO cannot be applied');
+        if (eco.bomId) {
+          const currentBom = await tx.bOM.findUnique({
+            where: { id: eco.bomId },
+            include: { components: true, operations: true },
+          });
+
+          if (!currentBom) throw new Error('Source BOM not found');
+          if (currentBom.status !== 'ACTIVE') {
+            throw new Error('Source BOM has been archived — ECO cannot be applied');
+          }
+
+          currentBomId = currentBom.id;
+          newVersion = currentBom.version + 1;
+
+          const baseComponents = currentBom.components.map((c) => ({
+            componentName: c.componentName,
+            quantity: c.quantity,
+            unit: c.unit,
+          }));
+
+          updatedComponents = baseComponents
+            .map((c) => {
+              const change = changes.find((x) => x.componentName === c.componentName);
+              if (!change) return c;
+              if (change.changeType === 'REMOVED') return null;
+              if (change.changeType === 'CHANGED') return { ...c, quantity: Number(change.newQty || c.quantity) };
+              return c;
+            })
+            .filter(Boolean);
+
+          updatedOperations = currentBom.operations.map((o) => ({
+            name: o.name,
+            duration: o.duration,
+            workCenter: o.workCenter,
+          }));
         }
 
-        const newVersion = currentBom.version + 1;
-        const changes = Array.isArray(eco.bomComponentChanges) ? eco.bomComponentChanges : [];
-
-        const baseComponents = currentBom.components.map((c) => ({
-          componentName: c.componentName,
-          quantity: c.quantity,
-          unit: c.unit,
-        }));
-
-        const updatedComponents = baseComponents
-          .map((c) => {
-            const change = changes.find((x) => x.componentName === c.componentName);
-            if (!change) return c;
-            if (change.changeType === 'REMOVED') return null;
-            if (change.changeType === 'CHANGED') return { ...c, quantity: Number(change.newQty || c.quantity) };
-            return c;
-          })
-          .filter(Boolean);
-
+        // Add newly added components
         changes
           .filter((c) => c.changeType === 'ADDED')
           .forEach((c) => {
@@ -419,24 +448,20 @@ const applyECO = async (req, res) => {
             });
           });
 
-        await tx.bOM.update({
-          where: { id: currentBom.id },
-          data: { status: 'ARCHIVED' },
-        });
+        if (currentBomId) {
+          await tx.bOM.update({
+            where: { id: currentBomId },
+            data: { status: 'ARCHIVED' },
+          });
+        }
 
         await tx.bOM.create({
           data: {
-            productId: currentBom.productId,
+            productId: eco.productId,
             version: newVersion,
             status: 'ACTIVE',
             components: { create: updatedComponents },
-            operations: {
-              create: currentBom.operations.map((o) => ({
-                name: o.name,
-                duration: o.duration,
-                workCenter: o.workCenter,
-              })),
-            },
+            operations: updatedOperations.length > 0 ? { create: updatedOperations } : undefined,
           },
         });
       }
