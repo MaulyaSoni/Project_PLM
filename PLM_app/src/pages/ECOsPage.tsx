@@ -54,7 +54,7 @@ export default function ECOsPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-warning/10 border border-warning/20 text-warning text-xs font-semibold uppercase tracking-widest mb-3">
             <GitPullRequest className="h-3 w-3" /> Change Control
           </div>
-          <h1 className="text-4xl font-display font-bold tracking-tight text-white">Engineering Change Orders</h1>
+          <h1 className="text-4xl font-display font-bold tracking-tight text-foreground">Engineering Change Orders</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
             Track, approve, and deploy architectural modifications across the product infrastructure.
           </p>
@@ -66,35 +66,35 @@ export default function ECOsPage() {
         )}
       </div>
 
-      <div className="flex items-center gap-4 mb-6 flex-wrap p-4 rounded-2xl bg-card/30 backdrop-blur-md border border-white/5 shadow-lg">
+      <div className="flex items-center gap-4 mb-6 flex-wrap p-4 rounded-2xl bg-card/30 backdrop-blur-md border border-foreground/5 shadow-lg">
         <div className="relative flex-1 min-w-[280px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search ECO directives..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-11 h-12 bg-black/20 border-white/10 text-white placeholder:text-muted-foreground/70 focus-visible:ring-primary/50 focus-visible:border-primary/50 rounded-xl"
+            className="pl-11 h-12 bg-black/20 border-foreground/10 text-foreground placeholder:text-muted-foreground/70 focus-visible:ring-primary/50 focus-visible:border-primary/50 rounded-xl"
           />
         </div>
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-black/20 border border-white/10 text-muted-foreground">
+          <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-black/20 border border-foreground/10 text-muted-foreground">
             <SlidersHorizontal className="h-4 w-4" />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[160px] h-12 bg-black/20 border-white/10 text-white rounded-xl focus:ring-primary/50">
+            <SelectTrigger className="w-[160px] h-12 bg-black/20 border-foreground/10 text-foreground rounded-xl focus:ring-primary/50">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-popover border-white/10">
+            <SelectContent className="bg-popover border-foreground/10">
               <SelectItem value="ALL">All Schemas</SelectItem>
               <SelectItem value="PRODUCT">Product Link</SelectItem>
               <SelectItem value="BOM">BOM Link</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-12 bg-black/20 border-white/10 text-white rounded-xl focus:ring-primary/50">
+            <SelectTrigger className="w-[160px] h-12 bg-black/20 border-foreground/10 text-foreground rounded-xl focus:ring-primary/50">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-popover border-white/10">
+            <SelectContent className="bg-popover border-foreground/10">
               <SelectItem value="ALL">All States</SelectItem>
               <SelectItem value="NEW">New</SelectItem>
               <SelectItem value="IN_REVIEW">In Review</SelectItem>
@@ -105,7 +105,7 @@ export default function ECOsPage() {
         </div>
       </div>
 
-      <Card className="bg-card/40 backdrop-blur-xl border border-white/5 shadow-2xl overflow-hidden rounded-2xl">
+      <Card className="bg-card/40 backdrop-blur-xl border border-foreground/5 shadow-2xl overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           {filtered.length === 0 ? (
             <div className="py-24">
@@ -118,8 +118,8 @@ export default function ECOsPage() {
             </div>
           ) : (
             <Table>
-              <TableHeader className="bg-white/[0.02]">
-                <TableRow className="border-white/5 hover:bg-transparent">
+              <TableHeader className="bg-foreground/[0.02]">
+                <TableRow className="border-foreground/5 hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-medium py-5 px-6 text-xs uppercase tracking-wider">Designation</TableHead>
                   <TableHead className="text-muted-foreground font-medium py-5 text-xs uppercase tracking-wider">Schema</TableHead>
                   <TableHead className="text-muted-foreground font-medium py-5 text-xs uppercase tracking-wider">Target Entity</TableHead>
@@ -131,25 +131,25 @@ export default function ECOsPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map(eco => (
-                  <TableRow key={eco.id} className="border-white/5 transition-colors hover:bg-white/[0.03] group">
+                  <TableRow key={eco.id} className="border-foreground/5 transition-colors hover:bg-foreground/[0.03] group">
                     <TableCell className="font-medium py-4 px-6">
-                      <Link to={`/ecos/${eco.id}`} className="text-white group-hover:text-primary transition-colors underline-offset-4 text-base">{eco.title}</Link>
+                      <Link to={`/ecos/${eco.id}`} className="text-foreground group-hover:text-primary transition-colors underline-offset-4 text-base">{eco.title}</Link>
                     </TableCell>
                     <TableCell><TypeBadge type={eco.type} /></TableCell>
                     <TableCell className="text-muted-foreground">{eco.productName}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-foreground/5 border border-foreground/10 text-xs">
                         {eco.assignedToName}
                       </span>
                     </TableCell>
                     <TableCell><StatusBadge status={eco.status} /></TableCell>
                     <TableCell className="text-muted-foreground text-sm font-mono">{eco.effectiveDate}</TableCell>
                     <TableCell className="text-right pr-6 space-x-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-all" asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all" asChild>
                         <Link to={`/ecos/${eco.id}`}><Eye className="h-4 w-4" /></Link>
                       </Button>
                       {eco.status === 'NEW' && eco.createdBy === user?.id && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all">
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}

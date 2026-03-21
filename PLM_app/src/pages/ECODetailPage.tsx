@@ -120,7 +120,7 @@ export default function ECODetailPage() {
         <div className="col-span-3 space-y-6">
           {eco.type === 'PRODUCT' && eco.productChanges && (
             <div className="space-y-4">
-              <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
+              <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" /> Product Specification Changes
               </h3>
 
@@ -130,29 +130,29 @@ export default function ECODetailPage() {
                   const isNegative = c.newValue < c.oldValue;
 
                   return (
-                    <Card key={c.field + '-' + idx} className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden relative group hover:border-white/20 transition-colors">
+                    <Card key={c.field + '-' + idx} className="bg-card/40 backdrop-blur-xl border border-foreground/10 shadow-xl overflow-hidden relative group hover:border-foreground/20 transition-colors">
                       <div className={cn("absolute top-0 left-0 w-1 h-full",
                         isPositive ? 'bg-success' : isNegative ? 'bg-destructive' : 'bg-muted-foreground'
                       )} />
                       <CardContent className="p-5 pl-6">
-                        <p className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">{c.field}</p>
+                        <p className="text-sm font-semibold text-foreground/50 uppercase tracking-wider mb-3">{c.field}</p>
 
                         <div className="flex items-center justify-between">
                           <div className="space-y-1 w-[40%]">
-                            <p className="text-xs text-white/40 font-medium">Previous</p>
-                            <p className="font-mono text-lg text-white/70 line-through decoration-destructive/50 decoration-2">
+                            <p className="text-xs text-foreground/40 font-medium">Previous</p>
+                            <p className="font-mono text-lg text-foreground/70 line-through decoration-destructive/50 decoration-2">
                               ${c.oldValue.toLocaleString()}
                             </p>
                           </div>
 
                           <div className="flex items-center justify-center w-[20%]">
-                            <ArrowRight className="h-5 w-5 text-white/20" />
+                            <ArrowRight className="h-5 w-5 text-foreground/20" />
                           </div>
 
                           <div className="space-y-1 w-[40%] text-right">
                             <p className="text-xs text-primary/70 font-medium text-right shadow-primary">Proposed</p>
                             <p className={cn("font-mono text-xl font-bold dropshadow-md",
-                              isPositive ? 'text-success' : isNegative ? 'text-destructive' : 'text-white'
+                              isPositive ? 'text-success' : isNegative ? 'text-destructive' : 'text-foreground'
                             )}>
                               ${c.newValue.toLocaleString()}
                             </p>
@@ -168,19 +168,19 @@ export default function ECODetailPage() {
 
           {eco.type === 'BOM' && eco.bomComponentChanges && (
             <div className="space-y-4">
-              <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
+              <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
                 <Layers className="h-5 w-5 text-secondary" /> BOM Architecture Diff
               </h3>
 
-              <Card className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-xl p-0 overflow-hidden">
+              <Card className="bg-card/40 backdrop-blur-xl border border-foreground/10 shadow-xl p-0 overflow-hidden">
                 <CardContent className="p-0">
                   <Table>
-                    <TableHeader className="bg-white/[0.02]">
-                      <TableRow className="border-white/5 hover:bg-transparent">
-                        <TableHead className="text-white font-semibold py-4 px-6">Component Node</TableHead>
-                        <TableHead className="text-white font-semibold py-4">Before</TableHead>
-                        <TableHead className="text-white font-semibold py-4">After</TableHead>
-                        <TableHead className="text-right text-white font-semibold py-4 pr-6">Variance</TableHead>
+                    <TableHeader className="bg-foreground/[0.02]">
+                      <TableRow className="border-foreground/5 hover:bg-transparent">
+                        <TableHead className="text-foreground font-semibold py-4 px-6">Component Node</TableHead>
+                        <TableHead className="text-foreground font-semibold py-4">Before</TableHead>
+                        <TableHead className="text-foreground font-semibold py-4">After</TableHead>
+                        <TableHead className="text-right text-foreground font-semibold py-4 pr-6">Variance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -194,11 +194,11 @@ export default function ECODetailPage() {
                         const decrease = isChanged && Number(c.newQty) < Number(c.oldQty);
 
                         return (
-                          <TableRow key={c.componentName + '-' + idx} className={cn('border-white/5 transition-colors group',
+                          <TableRow key={c.componentName + '-' + idx} className={cn('border-foreground/5 transition-colors group',
                             isAdded && 'bg-success/[0.02] hover:bg-success/[0.05]',
                             isRemoved && 'bg-destructive/[0.02] hover:bg-destructive/[0.05]',
                             isChanged && 'bg-warning/[0.02] hover:bg-warning/[0.05]',
-                            isUnchanged && 'hover:bg-white/[0.02]'
+                            isUnchanged && 'hover:bg-foreground/[0.02]'
                           )}>
                             <TableCell className="px-6 py-4">
                               <div className="flex items-center gap-3">
@@ -206,17 +206,17 @@ export default function ECODetailPage() {
                                   isAdded ? 'bg-success shadow-[0_0_8px_rgba(0,255,128,0.6)]' :
                                     isRemoved ? 'bg-destructive shadow-[0_0_8px_rgba(255,0,0,0.6)]' :
                                       isChanged ? 'bg-warning shadow-[0_0_8px_rgba(255,166,0,0.6)]' :
-                                        'bg-white/20'
+                                        'bg-foreground/20'
                                 )} />
-                                <span className="font-medium text-white">{c.componentName}</span>
+                                <span className="font-medium text-foreground">{c.componentName}</span>
                               </div>
                             </TableCell>
 
-                            <TableCell className="font-mono text-white/50">
-                              {isAdded ? '—' : isRemoved ? <span className="text-destructive max-w-max line-through decoration-destructive/50">{c.oldQty}</span> : isChanged ? <span className="text-white/60 line-through decoration-white/30">{c.oldQty}</span> : c.oldQty}
+                            <TableCell className="font-mono text-foreground/50">
+                              {isAdded ? '—' : isRemoved ? <span className="text-destructive max-w-max line-through decoration-destructive/50">{c.oldQty}</span> : isChanged ? <span className="text-foreground/60 line-through decoration-foreground/30">{c.oldQty}</span> : c.oldQty}
                             </TableCell>
 
-                            <TableCell className="font-mono text-white">
+                            <TableCell className="font-mono text-foreground">
                               {isRemoved ? '—' : isAdded ? <span className="text-success font-bold">{c.newQty}</span> : isChanged ? <span className={increase ? 'text-success font-bold' : 'text-destructive font-bold'}>{c.newQty}</span> : c.newQty}
                             </TableCell>
 
@@ -225,7 +225,7 @@ export default function ECODetailPage() {
                               {isRemoved && <Badge className="bg-destructive text-destructive-foreground border-0 shadow-[0_0_10px_rgba(255,0,0,0.2)]">PURGED</Badge>}
                               {isChanged && increase && <Badge className="bg-warning text-warning-foreground border-0 shadow-[0_0_10px_rgba(255,166,0,0.2)]">SCALED UP</Badge>}
                               {isChanged && decrease && <Badge className="bg-warning text-warning-foreground border-0 shadow-[0_0_10px_rgba(255,166,0,0.2)]">SCALED DOWN</Badge>}
-                              {isUnchanged && <span className="text-xs font-mono text-white/30 tracking-widest">STABLE</span>}
+                              {isUnchanged && <span className="text-xs font-mono text-foreground/30 tracking-widest">STABLE</span>}
                             </TableCell>
                           </TableRow>
                         );
@@ -238,36 +238,36 @@ export default function ECODetailPage() {
           )}
 
           <div className="space-y-4 pt-4">
-            <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
-              <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-white/10"><span className="text-[10px] uppercase font-bold text-white">PDF</span></div>
+            <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
+              <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-foreground/10"><span className="text-[10px] uppercase font-bold text-foreground">PDF</span></div>
               Supporting Documentation
             </h3>
             <Card
-              className="bg-card/40 backdrop-blur-xl border border-white/10 border-dashed hover:border-white/30 transition-colors shadow-none cursor-pointer group"
+              className="bg-card/40 backdrop-blur-xl border border-foreground/10 border-dashed hover:border-foreground/30 transition-colors shadow-none cursor-pointer group"
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files) setAttachments(prev => [...prev, ...Array.from(e.dataTransfer.files!)]) }}
             >
               <input type="file" multiple className="hidden" ref={fileInputRef} onChange={(e) => { if (e.target.files) setAttachments(prev => [...prev, ...Array.from(e.target.files!)]) }} />
               <CardContent className="p-8 flex flex-col items-center justify-center text-center">
-                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all">
-                  <ArrowUp className="h-6 w-6 text-white/40 group-hover:text-primary transition-colors" />
+                <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all">
+                  <ArrowUp className="h-6 w-6 text-foreground/40 group-hover:text-primary transition-colors" />
                 </div>
-                <p className="text-white font-medium mb-1">Drag & drop technical payloads here</p>
-                <p className="text-sm text-white/40">Only authorized engineering documents (.pdf, .cad, .zip)</p>
+                <p className="text-foreground font-medium mb-1">Drag & drop technical payloads here</p>
+                <p className="text-sm text-foreground/40">Only authorized engineering documents (.pdf, .cad, .zip)</p>
               </CardContent>
             </Card>
 
             {attachments.length > 0 && (
               <div className="flex flex-col gap-2 mt-4">
                 {attachments.map((f, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 animate-fade-in shadow-sm">
-                    <span className="text-sm text-white font-medium tracking-wide flex items-center gap-2">
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-foreground/5 border border-foreground/10 animate-fade-in shadow-sm">
+                    <span className="text-sm text-foreground font-medium tracking-wide flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
                       {f.name}
                     </span>
                     <div className="flex items-center gap-4">
-                      <span className="text-xs text-white/40 font-mono">{(f.size / 1024).toFixed(1)} KB</span>
+                      <span className="text-xs text-foreground/40 font-mono">{(f.size / 1024).toFixed(1)} KB</span>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full hover:bg-destructive/20 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAttachments(attachments.filter((_, idx) => idx !== i)) }}>
                         <XCircle className="h-4 w-4" />
                       </Button>

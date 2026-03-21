@@ -58,27 +58,27 @@ export default function RegisterPage() {
             <div className="mx-auto h-12 w-12 rounded-xl bg-destructive/20 flex items-center justify-center mb-3">
               <Cog className="h-6 w-6 text-destructive" />
             </div>
-            <CardTitle className="text-xl font-display text-white">Admin Clearance Required</CardTitle>
-            <p className="text-sm text-white/50">Only administrators can provision new accounts</p>
+            <CardTitle className="text-xl font-display text-foreground">Admin Clearance Required</CardTitle>
+            <p className="text-sm text-foreground/50">Only administrators can provision new accounts</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAdminVerification} className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-white/70">Master Access Key</Label>
+                <Label className="text-foreground/70">Master Access Key</Label>
                 <Input
                   type="password"
                   value={adminPassword}
                   onChange={e => setAdminPassword(e.target.value)}
                   required
-                  className="bg-card/40 border-white/10 text-white placeholder:text-white/30"
+                  className="bg-card/40 border-foreground/10 text-foreground placeholder:text-foreground/30"
                   placeholder="Enter admin key..."
                 />
               </div>
-              <Button type="submit" className="w-full bg-destructive text-white hover:bg-destructive/90 transition-all font-semibold">
+              <Button type="submit" className="w-full bg-destructive text-foreground hover:bg-destructive/90 transition-all font-semibold">
                 Unlock Registration
               </Button>
             </form>
-            <p className="text-center text-sm text-white/40 mt-6">
+            <p className="text-center text-sm text-foreground/40 mt-6">
               Already have an account?{' '}
               <Link to="/login" className="text-primary hover:text-primary/80 transition-colors">Sign In</Link>
             </p>

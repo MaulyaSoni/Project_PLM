@@ -47,7 +47,7 @@ export default function DashboardPage() {
   return (
     <div className="animate-fade-in text-foreground pb-12">
       {/* Header Hero Section */}
-      <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-br from-card to-background border border-white/5 p-8 shadow-2xl">
+      <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-br from-card to-background border border-foreground/5 p-8 shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
         <div className="absolute -top-24 -right-12 w-64 h-64 bg-primary/10 rounded-full blur-[80px]"></div>
         <div className="absolute -bottom-24 -left-12 w-64 h-64 bg-secondary/10 rounded-full blur-[80px]"></div>
@@ -57,7 +57,7 @@ export default function DashboardPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-widest mb-4">
               <Zap className="h-3 w-3" /> System Online
             </div>
-            <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-white mb-2">
+            <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-foreground mb-2">
               Command <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Center</span>
             </h1>
             <p className="text-muted-foreground text-lg max-w-xl">
@@ -81,7 +81,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">{card.label}</p>
-                  <p className="text-4xl font-display font-bold text-white tracking-tight">{stats[card.key as keyof typeof stats]}</p>
+                  <p className="text-4xl font-display font-bold text-foreground tracking-tight">{stats[card.key as keyof typeof stats]}</p>
                 </div>
                 <div className={`h-12 w-12 rounded-xl transition-all duration-300 group-hover:scale-110 group-hover:${card.glow} ${card.bg} flex items-center justify-center`}>
                   <card.icon className={`h-6 w-6 ${card.color}`} />
@@ -97,18 +97,18 @@ export default function DashboardPage() {
 
         {/* Recent ECOs - Takes 2 columns */}
         <div className="lg:col-span-2">
-          <Card className="bg-card/40 backdrop-blur-xl border border-white/5 shadow-xl h-full flex flex-col">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <Card className="bg-card/40 backdrop-blur-xl border border-foreground/5 shadow-xl h-full flex flex-col">
+            <div className="p-6 border-b border-foreground/5 flex items-center justify-between bg-foreground/[0.02]">
               <div className="flex items-center gap-3">
                 <Activity className="h-5 w-5 text-primary" />
-                <h3 className="font-display font-bold text-lg text-white">Active Telemetry: ECOs</h3>
+                <h3 className="font-display font-bold text-lg text-foreground">Active Telemetry: ECOs</h3>
               </div>
               <Link to="/ecos" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">View Trajectory →</Link>
             </div>
             <CardContent className="p-0 flex-1">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/5 bg-transparent hover:bg-transparent">
+                  <TableRow className="border-foreground/5 bg-transparent hover:bg-transparent">
                     <TableHead className="text-muted-foreground font-medium py-4 px-6 text-xs uppercase tracking-wider">Designation</TableHead>
                     <TableHead className="text-muted-foreground font-medium py-4 text-xs uppercase tracking-wider">Classification</TableHead>
                     <TableHead className="text-muted-foreground font-medium py-4 text-xs uppercase tracking-wider">Target Schema</TableHead>
@@ -118,9 +118,9 @@ export default function DashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {ecos.slice(0, 6).map(eco => (
-                    <TableRow key={eco.id} className="border-white/5 transition-colors hover:bg-white/[0.02] group">
+                    <TableRow key={eco.id} className="border-foreground/5 transition-colors hover:bg-foreground/[0.02] group">
                       <TableCell className="font-medium py-4 px-6">
-                        <Link to={`/ecos/${eco.id}`} className="text-white group-hover:text-primary transition-colors underline-offset-4">{eco.title}</Link>
+                        <Link to={`/ecos/${eco.id}`} className="text-foreground group-hover:text-primary transition-colors underline-offset-4">{eco.title}</Link>
                       </TableCell>
                       <TableCell><TypeBadge type={eco.type} /></TableCell>
                       <TableCell className="text-muted-foreground">{eco.productName}</TableCell>
@@ -139,31 +139,31 @@ export default function DashboardPage() {
 
         {/* Quick Links & Operations - Takes 1 column */}
         <div className="space-y-6 flex flex-col">
-          <Card className="bg-card/40 backdrop-blur-xl border border-white/5 shadow-xl relative overflow-hidden">
+          <Card className="bg-card/40 backdrop-blur-xl border border-foreground/5 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-[40px]"></div>
-            <div className="p-6 border-b border-white/5 bg-white/[0.02]">
-              <h3 className="font-display font-bold text-lg text-white">Execution Shortcuts</h3>
+            <div className="p-6 border-b border-foreground/5 bg-foreground/[0.02]">
+              <h3 className="font-display font-bold text-lg text-foreground">Execution Shortcuts</h3>
             </div>
             <CardContent className="p-6 space-y-3 relative z-10">
-              <Button asChild className="w-full justify-start h-12 bg-white/5 hover:bg-white/10 border border-white/10 text-white group" variant="outline">
+              <Button asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
                 <Link to="/products"><Package className="h-5 w-5 mr-3 text-primary group-hover:scale-110 transition-transform" /> Initialize Product Matrix</Link>
               </Button>
-              <Button asChild className="w-full justify-start h-12 bg-white/5 hover:bg-white/10 border border-white/10 text-white group" variant="outline">
+              <Button asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
                 <Link to="/boms"><Layers className="h-5 w-5 mr-3 text-secondary group-hover:scale-110 transition-transform" /> Construct BOM</Link>
               </Button>
-              <Button asChild className="w-full justify-start h-12 bg-white/5 hover:bg-white/10 border border-white/10 text-white group" variant="outline">
+              <Button asChild className="w-full justify-start h-12 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground group" variant="outline">
                 <Link to="/ecos"><GitPullRequest className="h-5 w-5 mr-3 text-warning group-hover:scale-110 transition-transform" /> Draft Change Order</Link>
               </Button>
             </CardContent>
           </Card>
 
           {/* Environment Status Card */}
-          <Card className="bg-card/40 backdrop-blur-xl border border-white/5 shadow-xl flex-1 flex flex-col justify-center items-center p-8 relative overflow-hidden">
+          <Card className="bg-card/40 backdrop-blur-xl border border-foreground/5 shadow-xl flex-1 flex flex-col justify-center items-center p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-50"></div>
             <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 mb-4 shadow-[0_0_30px_0_rgba(0,242,255,0.3)] animate-pulse">
               <ShieldCheckIcon className="h-8 w-8 text-primary" />
             </div>
-            <h4 className="text-white font-display font-bold mb-1">System Nominal</h4>
+            <h4 className="text-foreground font-display font-bold mb-1">System Nominal</h4>
             <p className="text-sm text-muted-foreground text-center">All infrastructure nodes are responding optimally inside the Forge environment.</p>
           </Card>
         </div>
