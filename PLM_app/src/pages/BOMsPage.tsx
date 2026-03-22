@@ -86,7 +86,7 @@ export default function BOMsPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-success/10 border border-success/20 text-success text-xs font-semibold uppercase tracking-widest mb-3">
             <Layers className="h-3 w-3" /> Architecture Matrix
           </div>
-          <h1 className="text-4xl font-display font-bold tracking-tight text-foreground mb-2 shadow-primary/20 drop-shadow-lg">Bills of Materials</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-2">Bills of Materials</h1>
           <p className="text-success/90 tracking-wide font-medium italic">
             "Smart Product Structure with Controlled Dependencies"
           </p>
@@ -95,50 +95,48 @@ export default function BOMsPage() {
       </div>
 
       <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
-        <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-3xl border border-white/5 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] hover:shadow-[0_8px_32px_0_rgba(157,255,0,0.15)] transition-all duration-500 p-8 group">
-          <div className="absolute -top-24 -left-12 w-64 h-64 bg-success/15 rounded-full blur-[80px] pointer-events-none group-hover:bg-success/25 transition-all duration-700"></div>
+        <div className="relative overflow-hidden rounded-xl bg-card border shadow-sm transition-all duration-500 p-6">
           <div className="relative z-10 flex flex-col h-full justify-center">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 rounded-2xl bg-secondary/10 border border-secondary/20">
-                <Cpu className="text-secondary h-6 w-6" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-secondary/10 border-secondary/20">
+                <Cpu className="text-secondary h-5 w-5" />
               </div>
-              <h3 className="font-display font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-foreground to-foreground/60">Immutable Matrix</h3>
+              <h3 className="font-semibold text-lg">Immutable Matrix</h3>
             </div>
-            <p className="text-foreground/70 leading-relaxed font-medium text-[16px]">
+            <p className="text-muted-foreground leading-relaxed text-sm">
               Guaranteed data integrity, traceability, and operational clarity across your entire assembly tree with rigorous access controls and version locking mechanisms.
             </p>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-3xl border border-white/5 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] hover:shadow-[0_8px_32px_0_rgba(255,77,77,0.15)] transition-all duration-500 p-8 group">
-          <div className="absolute -bottom-24 -right-12 w-64 h-64 bg-primary/15 rounded-full blur-[80px] pointer-events-none group-hover:bg-primary/25 transition-all duration-700"></div>
+        <div className="relative overflow-hidden rounded-xl bg-card border shadow-sm transition-all duration-500 p-6">
           <div className="relative z-10 flex flex-col h-full justify-center">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 rounded-2xl bg-warning/10 border border-warning/20">
-                <ShieldAlert className="text-warning h-6 w-6" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-warning/10 border border-warning/20">
+                <ShieldAlert className="text-warning h-5 w-5" />
               </div>
-              <h3 className="font-display font-black text-2xl text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/50">Controlled Revisions</h3>
+              <h3 className="font-semibold text-lg">Controlled Revisions</h3>
             </div>
-            <p className="text-foreground/70 leading-relaxed font-medium text-[16px]">
+            <p className="text-muted-foreground leading-relaxed text-sm">
               Engineering Change Orders (ECOs) are the sole gatekeeper for architectural changes, cementing a resilient and fault-tolerant release management structure.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-6 flex-wrap p-4 rounded-[2rem] bg-card/30 backdrop-blur-2xl border border-white/5 shadow-xl">
+      <div className="flex items-center gap-4 mb-6 flex-wrap p-4 rounded-xl bg-card border shadow-sm">
         <div className="relative flex-1 min-w-[280px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input placeholder="Search architecture matrix..." value={search} onChange={e => setSearch(e.target.value)} className="pl-12 h-14 bg-background/40 border-white/5 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50 focus-visible:border-primary/50 rounded-2xl text-base shadow-inner" />
+          <Input placeholder="Search architecture matrix..." value={search} onChange={e => setSearch(e.target.value)} className="pl-12 h-14 bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50 focus-visible:border-primary/50 rounded-xl text-base" />
         </div>
-        <div className="flex bg-background/40 border border-white/5 rounded-2xl p-1.5 h-14 items-center">
+        <div className="flex bg-background border border-border rounded-xl p-1.5 h-14 items-center">
           {(['ALL', 'ACTIVE', 'ARCHIVED'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-300 ${statusFilter === s ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,242,255,0.4)]' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}>{s === 'ALL' ? 'Global States' : s === 'ACTIVE' ? 'Active Trees' : 'Vaulted'}</button>
+            <button key={s} onClick={() => setStatusFilter(s)} className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{s === 'ALL' ? 'Global States' : s === 'ACTIVE' ? 'Active Trees' : 'Vaulted'}</button>
           ))}
         </div>
       </div>
 
-      <Card className="bg-card/40 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] rounded-[2.5rem] overflow-hidden">
+      <Card className="bg-card border-border shadow-sm rounded-xl overflow-hidden">
         <CardContent className="p-0">
           {filtered.length === 0 ? (
             <div className="py-24">
@@ -147,8 +145,8 @@ export default function BOMsPage() {
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-white/5 h-14">
-                  <TableRow className="border-white/5 hover:bg-transparent">
+                <TableHeader className="bg-muted/50 h-14">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-muted-foreground font-semibold py-5 px-6 text-xs uppercase tracking-widest">Architecture</TableHead>
                     <TableHead className="text-muted-foreground font-semibold py-5 text-xs uppercase tracking-widest">Revision</TableHead>
                     <TableHead className="text-muted-foreground font-semibold py-5 text-xs uppercase tracking-widest">Components</TableHead>
@@ -160,17 +158,17 @@ export default function BOMsPage() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(b => (
-                    <TableRow key={b.id} className="border-white/5 transition-all duration-300 hover:bg-white/5 group">
-                      <TableCell className="font-display font-medium text-foreground px-6 py-5 text-lg">{b.productName}</TableCell>
+                    <TableRow key={b.id} className="border-border transition-all duration-300 hover:bg-muted/50 group">
+                      <TableCell className="font-medium text-foreground px-6 py-5 text-base">{b.productName}</TableCell>
                       <TableCell className="text-primary font-mono bg-primary/10 px-3 py-1 rounded-lg w-max ml-1 mt-3 inline-block font-semibold">v{b.currentVersion}.0</TableCell>
                       <TableCell className="text-foreground font-mono">{b.components.length} node{b.components.length !== 1 && 's'}</TableCell>
                       <TableCell className="text-foreground font-mono">{b.operations.length} step{b.operations.length !== 1 && 's'}</TableCell>
                       <TableCell><StatusBadge status={b.status} /></TableCell>
-                      <TableCell className="text-foreground/50 text-sm font-mono">{b.createdAt}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm font-mono">{b.createdAt}</TableCell>
                       <TableCell className="text-right pr-6 space-x-2">
-                        <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-primary hover:bg-primary/15 rounded-xl transition-all" onClick={() => setDetailBOM(b)}><Eye className="h-5 w-5" /></Button>
-                        {canRaiseEco && <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-warning hover:bg-warning/15 rounded-xl transition-all disabled:opacity-30" disabled={b.status === 'ARCHIVED'} onClick={() => handleRaiseEco(b)}><GitPullRequest className="h-5 w-5" /></Button>}
-                        {canArchive && b.status === 'ACTIVE' && <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/15 rounded-xl transition-all" onClick={() => setArchiveTarget(b.id)}><Archive className="h-5 w-5" /></Button>}
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all" onClick={() => setDetailBOM(b)}><Eye className="h-4 w-4" /></Button>
+                        {canRaiseEco && <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-warning hover:bg-warning/10 rounded-lg transition-all disabled:opacity-30" disabled={b.status === 'ARCHIVED'} onClick={() => handleRaiseEco(b)}><GitPullRequest className="h-4 w-4" /></Button>}
+                        {canArchive && b.status === 'ACTIVE' && <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all" onClick={() => setArchiveTarget(b.id)}><Archive className="h-4 w-4" /></Button>}
                       </TableCell>
                     </TableRow>
                   ))}

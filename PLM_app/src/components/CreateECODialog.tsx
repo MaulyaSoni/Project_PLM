@@ -554,7 +554,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                     <div key={i} className="flex gap-2 text-xs">
                       <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-bold text-destructive">Conflict with "{c.conflicting_eco_title}"</p>
+                        <p className="font-semibold text-destructive">Conflict with "{c.conflicting_eco_title}"</p>
                         <p className="text-muted-foreground">{c.description}</p>
                         <p className="text-primary font-medium mt-1">💡 {c.suggestion}</p>
                       </div>

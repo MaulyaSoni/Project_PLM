@@ -114,7 +114,7 @@ export default function ECODetailPage() {
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-display font-bold mb-2">{eco.title}</h1>
+              <h1 className="text-2xl font-semibold mb-2">{eco.title}</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <TypeBadge type={eco.type} />
                 <StatusBadge status={eco.status} />
@@ -174,7 +174,7 @@ export default function ECODetailPage() {
         <div className="col-span-3 space-y-6">
           {eco.type === 'PRODUCT' && eco.productChanges && (
             <div className="space-y-4">
-              <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" /> Product Specification Changes
               </h3>
 
@@ -186,35 +186,35 @@ export default function ECODetailPage() {
                   const isNeutral = c.newValue === c.oldValue;
 
                   return (
-                    <Card key={c.field + '-' + idx} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] overflow-hidden relative group hover:border-white/20 transition-colors rounded-3xl">
+                    <Card key={c.field + '-' + idx} className="bg-card border border-border shadow-sm overflow-hidden relative group hover:border-primary/50 transition-colors rounded-xl">
                       <div className={cn("absolute top-0 left-0 w-1.5 h-full",
-                        isPositive ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' :
-                          isNegative ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' :
-                            'bg-white/20'
+                        isPositive ? 'bg-success' :
+                          isNegative ? 'bg-destructive' :
+                            'bg-muted'
                       )} />
                       <CardContent className="p-6 pl-8">
-                        <p className="text-sm font-bold text-white/50 uppercase tracking-widest mb-4">{c.field}</p>
+                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-4">{c.field}</p>
 
                         <div className="flex items-center justify-between">
                           <div className="space-y-1 w-[40%]">
-                            <p className="text-xs text-white/40 font-semibold">Old Version</p>
-                            <p className={cn("font-mono text-xl",
-                              isPositive || isNegative ? "text-white/40 line-through decoration-white/30 decoration-2" : "text-white/70"
+                            <p className="text-xs text-muted-foreground font-medium">Old Value</p>
+                            <p className={cn("font-mono text-lg",
+                              isPositive || isNegative ? "text-muted-foreground line-through" : "text-foreground"
                             )}>
                               ${c.oldValue.toLocaleString()}
                             </p>
                           </div>
 
                           <div className="flex items-center justify-center w-[20%]">
-                            <ArrowRight className="h-5 w-5 text-primary/50" />
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
                           </div>
 
                           <div className="space-y-1 w-[40%] text-right">
-                            <p className="text-xs text-primary/70 font-semibold">New Version</p>
-                            <p className={cn("font-mono text-2xl font-extrabold drop-shadow-md",
-                              isPositive ? 'text-green-400' :
-                                isNegative ? 'text-red-400' :
-                                  'text-white'
+                            <p className="text-xs text-primary font-medium">New Value</p>
+                            <p className={cn("font-mono text-xl font-semibold",
+                              isPositive ? 'text-success' :
+                                isNegative ? 'text-destructive' :
+                                  'text-foreground'
                             )}>
                               ${c.newValue.toLocaleString()}
                             </p>
@@ -226,22 +226,22 @@ export default function ECODetailPage() {
                 })}
 
                 {/* Attachments comparison card */}
-                <Card className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] overflow-hidden relative group hover:border-white/20 transition-colors rounded-3xl col-span-full md:col-span-1">
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]" />
+                <Card className="bg-card border border-border shadow-sm overflow-hidden relative group hover:border-primary/50 transition-colors rounded-xl col-span-full md:col-span-1">
+                  <div className="absolute top-0 left-0 w-1.5 h-full bg-success" />
                   <CardContent className="p-6 pl-8">
-                    <p className="text-sm font-bold text-white/50 uppercase tracking-widest mb-4">Attachments</p>
+                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-4">Attachments</p>
 
                     <div className="flex items-center justify-between">
                       <div className="space-y-1 w-[40%]">
-                        <p className="text-xs text-white/40 font-semibold">Old Version</p>
-                        <p className="font-mono text-white/40 line-through decoration-white/30 decoration-2">0 files</p>
+                        <p className="text-xs text-muted-foreground font-medium">Old Version</p>
+                        <p className="font-mono text-muted-foreground line-through">0 files</p>
                       </div>
                       <div className="flex items-center justify-center w-[20%]">
-                        <ArrowRight className="h-5 w-5 text-primary/50" />
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="space-y-1 w-[40%] text-right">
-                        <p className="text-xs text-primary/70 font-semibold">New Version</p>
-                        <p className="font-mono text-xl font-extrabold text-green-400 drop-shadow-md">1 file</p>
+                        <p className="text-xs text-primary font-medium">New Version</p>
+                        <p className="font-mono text-xl font-semibold text-success">1 file</p>
                       </div>
                     </div>
                   </CardContent>
@@ -252,19 +252,19 @@ export default function ECODetailPage() {
 
           {eco.type === 'BOM' && eco.bomComponentChanges && (
             <div className="space-y-4">
-              <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
                 <Layers className="h-5 w-5 text-primary" /> BOM Component Comparison
               </h3>
 
-              <Card className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] p-0 overflow-hidden rounded-3xl">
+              <Card className="bg-card border-border shadow-sm p-0 overflow-hidden rounded-xl">
                 <CardContent className="p-0">
                   <Table>
-                    <TableHeader className="bg-white/[0.02]">
-                      <TableRow className="border-white/5 hover:bg-transparent">
-                        <TableHead className="text-white/40 font-bold py-4 px-6">Component</TableHead>
-                        <TableHead className="text-white/40 font-bold py-4">Old Version</TableHead>
-                        <TableHead className="text-white/40 font-bold py-4">New Version</TableHead>
-                        <TableHead className="text-right text-white/40 font-bold py-4 pr-6">Variance</TableHead>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-muted-foreground font-medium py-4 px-6">Component</TableHead>
+                        <TableHead className="text-muted-foreground font-medium py-4">Old Version</TableHead>
+                        <TableHead className="text-muted-foreground font-medium py-4">New Version</TableHead>
+                        <TableHead className="text-right text-muted-foreground font-medium py-4 pr-6">Variance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -282,36 +282,36 @@ export default function ECODetailPage() {
                         const isNeutral = isUnchanged;
 
                         return (
-                          <TableRow key={c.componentName + '-' + idx} className={cn('border-white/5 transition-all duration-300 group',
-                            isGreen && 'bg-green-500/[0.05] hover:bg-green-500/[0.1] bg-[radial-gradient(rgba(34,197,94,0.15)_1px,transparent_1px)] bg-[size:16px_16px]',
-                            isRed && 'bg-red-500/[0.05] hover:bg-red-500/[0.1] bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(239,68,68,0.05)_10px,rgba(239,68,68,0.05)_20px)]',
-                            isNeutral && 'hover:bg-white/[0.02]'
+                          <TableRow key={c.componentName + '-' + idx} className={cn('border-border transition-colors group',
+                            isGreen && 'bg-success/5 hover:bg-success/10',
+                            isRed && 'bg-destructive/5 hover:bg-destructive/10',
+                            isNeutral && 'hover:bg-muted/50'
                           )}>
                             <TableCell className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className={cn("w-2 h-2 rounded-full",
-                                  isGreen ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' :
-                                    isRed ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' :
-                                      'bg-white/20'
+                                  isGreen ? 'bg-success' :
+                                    isRed ? 'bg-destructive' :
+                                      'bg-muted-foreground'
                                 )} />
-                                <span className="font-bold text-white">{c.componentName}</span>
+                                <span className="font-medium text-foreground">{c.componentName}</span>
                               </div>
                             </TableCell>
 
-                            <TableCell className="font-mono text-white/50 text-sm">
-                              {isAdded ? '—' : isRemoved ? <span className="text-red-400 line-through">{c.oldQty}</span> : isChanged ? <span className="text-white/40 line-through">{c.oldQty}</span> : c.oldQty}
+                            <TableCell className="font-mono text-muted-foreground text-sm">
+                              {isAdded ? '—' : isRemoved ? <span className="text-destructive line-through">{c.oldQty}</span> : isChanged ? <span className="text-muted-foreground line-through">{c.oldQty}</span> : c.oldQty}
                             </TableCell>
 
-                            <TableCell className="font-mono text-white tracking-widest text-sm">
-                              {isRemoved ? '—' : isAdded ? <span className="text-green-400 font-extrabold">{c.newQty}</span> : isChanged ? <span className={increase ? 'text-green-400 font-extrabold' : 'text-red-400 font-extrabold'}>{c.newQty}</span> : c.newQty}
+                            <TableCell className="font-mono text-foreground tracking-widest text-sm">
+                              {isRemoved ? '—' : isAdded ? <span className="text-success font-semibold">{c.newQty}</span> : isChanged ? <span className={increase ? 'text-success font-semibold' : 'text-destructive font-semibold'}>{c.newQty}</span> : c.newQty}
                             </TableCell>
 
                             <TableCell className="text-right pr-6">
-                              {isAdded && <Badge className="bg-green-500/20 text-green-400 border-0">Added</Badge>}
-                              {isRemoved && <Badge className="bg-red-500/20 text-red-400 border-0">Reduced (Purged)</Badge>}
-                              {isChanged && increase && <Badge className="bg-green-500/20 text-green-400 border-0">Added (Scaled Up)</Badge>}
-                              {isChanged && decrease && <Badge className="bg-red-500/20 text-red-400 border-0">Reduced (Scaled Down)</Badge>}
-                              {isUnchanged && <span className="text-xs font-bold text-white/30 tracking-widest uppercase">Neutral</span>}
+                              {isAdded && <Badge variant="outline" className="bg-success/10 text-success border-success/20">Added</Badge>}
+                              {isRemoved && <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Removed</Badge>}
+                              {isChanged && increase && <Badge variant="outline" className="bg-success/10 text-success border-success/20">Increased</Badge>}
+                              {isChanged && decrease && <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Decreased</Badge>}
+                              {isUnchanged && <span className="text-xs font-medium text-muted-foreground tracking-widest uppercase">Neutral</span>}
                             </TableCell>
                           </TableRow>
                         );
@@ -323,49 +323,49 @@ export default function ECODetailPage() {
 
               {/* Operation time changes placeholder if empty */}
               <div className="mt-6">
-                <h4 className="text-md font-extrabold text-white flex items-center gap-2 mb-3">
-                  <Clock className="h-4 w-4 text-white/50" /> Operation Time Changes
+                <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
+                  <Clock className="h-4 w-4 text-muted-foreground" /> Operation Time Changes
                 </h4>
-                <Card className="bg-white/[0.02] border border-white/5 shadow-none p-4 rounded-3xl flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white/50">No modifications to Assembly or Work Center durations in this ECO.</span>
-                  <Badge className="bg-white/10 text-white border-0 uppercase text-[10px] tracking-widest">Neutral</Badge>
+                <Card className="bg-card border border-border p-4 rounded-xl flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">No modifications to Assembly or Work Center durations in this ECO.</span>
+                  <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">Neutral</Badge>
                 </Card>
               </div>
             </div>
           )}
 
           <div className="space-y-4 pt-4">
-            <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
-              <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-foreground/10"><span className="text-[10px] uppercase font-bold text-foreground">PDF</span></div>
+            <h3 className="text-xl font-display font-semibold text-foreground flex items-center gap-2">
+              <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-muted"><span className="text-[10px] uppercase font-medium text-muted-foreground">PDF</span></div>
               Supporting Documentation
             </h3>
             <Card
-              className="bg-card/40 backdrop-blur-xl border border-foreground/10 border-dashed hover:border-foreground/30 transition-colors shadow-none cursor-pointer group"
+              className="bg-card border border-border border-dashed hover:border-primary/50 transition-colors shadow-sm cursor-pointer group"
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files) setAttachments(prev => [...prev, ...Array.from(e.dataTransfer.files!)]) }}
             >
               <input type="file" multiple className="hidden" ref={fileInputRef} onChange={(e) => { if (e.target.files) setAttachments(prev => [...prev, ...Array.from(e.target.files!)]) }} />
               <CardContent className="p-8 flex flex-col items-center justify-center text-center">
-                <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all">
-                  <ArrowUp className="h-6 w-6 text-foreground/40 group-hover:text-primary transition-colors" />
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4 group-hover:scale-105 group-hover:bg-primary/10 transition-all">
+                  <ArrowUp className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <p className="text-foreground font-medium mb-1">Drag & drop technical payloads here</p>
-                <p className="text-sm text-foreground/40">Only authorized engineering documents (.pdf, .cad, .zip)</p>
+                <p className="text-sm text-muted-foreground">Only authorized engineering documents (.pdf, .cad, .zip)</p>
               </CardContent>
             </Card>
 
             {attachments.length > 0 && (
               <div className="flex flex-col gap-2 mt-4">
                 {attachments.map((f, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-foreground/5 border border-foreground/10 animate-fade-in shadow-sm">
-                    <span className="text-sm text-foreground font-medium tracking-wide flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  <div key={i} className="flex items-center justify-between p-3 rounded-md bg-card border border-border shadow-sm">
+                    <span className="text-sm text-foreground font-medium flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-success" />
                       {f.name}
                     </span>
                     <div className="flex items-center gap-4">
-                      <span className="text-xs text-foreground/40 font-mono">{(f.size / 1024).toFixed(1)} KB</span>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full hover:bg-destructive/20 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAttachments(attachments.filter((_, idx) => idx !== i)) }}>
+                      <span className="text-xs text-muted-foreground font-mono">{(f.size / 1024).toFixed(1)} KB</span>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAttachments(attachments.filter((_, idx) => idx !== i)) }}>
                         <XCircle className="h-4 w-4" />
                       </Button>
                     </div>
@@ -379,16 +379,16 @@ export default function ECODetailPage() {
         {/* Right — Actions */}
         <div className="col-span-2 space-y-4">
           {/* AI Impact Analysis */}
-          <Card className="bg-card border-border overflow-hidden">
-            <div className="bg-primary/5 px-4 py-3 border-b border-border flex items-center justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2">
+          <Card className="bg-card border-border overflow-hidden shadow-sm">
+            <div className="bg-muted/30 px-4 py-3 border-b border-border flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
                 <Sparkles className="h-4 w-4 text-primary" /> AI Risk & Impact Assessment
               </h3>
               {!impactData && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-[10px] uppercase font-bold tracking-wider hover:bg-primary/10"
+                  className="h-7 text-[10px] uppercase font-semibold tracking-wider text-muted-foreground hover:text-foreground"
                   onClick={generateImpact}
                   disabled={generatingImpact}
                 >
@@ -401,19 +401,19 @@ export default function ECODetailPage() {
                 <>
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Risk Level</p>
-                      <Badge className={cn(
-                        "font-bold px-2 py-0.5",
-                        impactData.risk_level === 'LOW' && 'bg-success/20 text-success border-0',
-                        impactData.risk_level === 'MEDIUM' && 'bg-warning/20 text-warning border-0',
-                        impactData.risk_level === 'HIGH' && 'bg-destructive/20 text-destructive border-0',
-                        impactData.risk_level === 'CRITICAL' && 'bg-destructive text-white border-0'
+                      <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-widest">Risk Level</p>
+                      <Badge variant="outline" className={cn(
+                        "font-medium px-2 py-0.5",
+                        impactData.risk_level === 'LOW' && 'bg-success/10 text-success border-success/20',
+                        impactData.risk_level === 'MEDIUM' && 'bg-warning/10 text-warning border-warning/20',
+                        impactData.risk_level === 'HIGH' && 'bg-destructive/10 text-destructive border-destructive/20',
+                        impactData.risk_level === 'CRITICAL' && 'bg-destructive text-destructive-foreground border-destructive'
                       )}>
                         {impactData.risk_level}
                       </Badge>
                     </div>
                     <div className="space-y-1 text-right">
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Urgency</p>
+                      <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-widest">Urgency</p>
                       <div className="flex items-center gap-1 justify-end">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
                           <div key={i} className={cn("h-1 w-2 rounded-full", i <= impactData.urgency_score ? 'bg-primary' : 'bg-muted')} />
@@ -422,19 +422,19 @@ export default function ECODetailPage() {
                     </div>
                   </div>
 
-                  <div className="p-3 bg-muted/30 rounded-xl border border-border/50">
-                    <p className="text-xs font-medium italic text-foreground/80">"{impactData.risk_summary}"</p>
+                  <div className="p-3 bg-muted/20 rounded-md border border-border">
+                    <p className="text-xs font-medium italic text-muted-foreground">"{impactData.risk_summary}"</p>
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
+                    <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-widest flex items-center gap-1.5">
                       <TrendingUp className="h-3 w-3" /> Estimated Impact
                     </p>
-                    <p className="text-xs font-semibold">{impactData.estimated_impact}</p>
+                    <p className="text-xs text-foreground">{impactData.estimated_impact}</p>
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
+                    <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-widest flex items-center gap-1.5">
                       <AlertTriangle className="h-3 w-3" /> Key Considerations
                     </p>
                     <ul className="space-y-1">
@@ -448,11 +448,11 @@ export default function ECODetailPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
+                    <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-widest flex items-center gap-1.5">
                       <Info className="h-3 w-3" /> AI Recommendation
                     </p>
                     <div className="bg-primary/5 p-3 rounded-xl border border-primary/20">
-                      <p className="text-xs font-bold text-primary">{impactData.recommendation}</p>
+                      <p className="text-xs font-semibold text-primary">{impactData.recommendation}</p>
                     </div>
                   </div>
                 </>

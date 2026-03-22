@@ -14,7 +14,7 @@ export default function ForbiddenPage() {
     <div className="min-h-[70vh] flex items-center justify-center px-6">
       <div className="max-w-lg text-center space-y-4">
         <ShieldX className="h-16 w-16 mx-auto text-destructive/70" />
-        <h1 className="text-3xl font-display font-bold">{isOperationsRestriction ? 'Access Restricted' : '403 - Access Denied'}</h1>
+        <h1 className="text-3xl font-semibold">{isOperationsRestriction ? 'Access Restricted' : '403 - Access Denied'}</h1>
         <p className="text-muted-foreground">
           {isOperationsRestriction
             ? 'Operations users have read-only access to Products and BOMs.'

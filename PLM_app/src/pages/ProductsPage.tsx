@@ -74,7 +74,7 @@ export default function ProductsPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-widest mb-3">
             <Package className="h-3 w-3" /> Core Catalog
           </div>
-          <h1 className="text-4xl font-display font-bold tracking-tight text-foreground mb-2">Product Master Grid</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-2">Product Master Grid</h1>
           <p className="text-primary/90 tracking-wide font-medium italic">
             "Smart Product Management with Controlled Changes"
           </p>
@@ -93,7 +93,7 @@ export default function ProductsPage() {
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-3">
               <ShieldCheck className="text-primary h-5 w-5" />
-              <h3 className="font-display font-bold text-lg text-foreground">What Does It Do?</h3>
+              <h3 className="font-semibold text-lg text-foreground">What Does It Do?</h3>
             </div>
             <p className="text-foreground leading-relaxed mb-4 font-medium text-[15px]">
               This platform manages products and their changes in a structured and controlled way. A Product Lifecycle Management (PLM) system that enables secure, version-controlled, and approval-driven changes.
@@ -107,7 +107,7 @@ export default function ProductsPage() {
         <div className="relative overflow-hidden rounded-2xl bg-card border border-foreground/10 shadow-xl p-6">
           <div className="absolute -bottom-24 -right-12 w-64 h-64 bg-success/10 rounded-full blur-[80px] pointer-events-none"></div>
           <div className="relative z-10">
-            <h3 className="font-display font-bold text-foreground mb-4 flex items-center gap-2">
+            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
               <Zap className="text-success h-4 w-4" /> Core Advantages
             </h3>
             <ul className="space-y-2.5 text-sm text-foreground/90 font-medium">

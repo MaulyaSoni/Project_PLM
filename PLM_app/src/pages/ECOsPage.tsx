@@ -55,7 +55,7 @@ export default function ECOsPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-warning/10 border border-warning/20 text-warning text-xs font-semibold uppercase tracking-widest mb-3">
             <GitPullRequest className="h-3 w-3" /> Change Control
           </div>
-          <h1 className="text-4xl font-display font-bold tracking-tight text-foreground">Engineering Change Orders</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Engineering Change Orders</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
             Track, approve, and deploy architectural modifications across the product infrastructure.
           </p>
