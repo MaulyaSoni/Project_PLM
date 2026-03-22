@@ -154,12 +154,14 @@ model ECO {
 }
 
 model ECOApproval {
-  id         String   @id @default(uuid())
-  ecoId      String
-  userId     String
-  approved   Boolean
-  comment    String?
-  createdAt  DateTime @default(now())
+  id                 String   @id @default(uuid())
+  ecoId              String
+  userId             String
+  approved           Boolean
+  comment            String?
+  checklistCompleted Boolean  @default(false) @map("checklist_completed")
+  checklistItems     String?  @map("checklist_items") // JSON array of completed checklist keys
+  createdAt          DateTime @default(now())
 
   eco        ECO      @relation(fields: [ecoId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)

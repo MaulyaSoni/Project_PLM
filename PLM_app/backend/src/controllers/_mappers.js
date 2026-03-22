@@ -88,6 +88,7 @@ const mapECO = (eco) => {
       action: a.approved ? 'APPROVED' : 'REJECTED',
       comment: a.comment || '',
       date: toDateOnly(a.createdAt),
+      checklistCompleted: a.checklistCompleted || false,
     })),
     auditLog: eco.auditLogs.map((l) => ({
       id: l.id,

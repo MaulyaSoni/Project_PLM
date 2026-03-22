@@ -251,12 +251,40 @@ const submitForReview = async (req, res) => {
   }
 };
 
+const REQUIRED_CHECKS = [
+  'reviewed_all_changes',
+  'verified_technical_feasibility',
+  'confirmed_no_compliance_issues',
+  'checked_production_impact',
+  'acknowledge_accountability',
+];
+
 const approveECO = async (req, res) => {
   try {
     const id = req.params.id;
     const comment = String(req.body.comment || '').trim();
+    const { checklistItems } = req.body;
+
     if (comment.length > COMMENT_MAX) {
       return res.status(400).json({ error: 'comment must be at most 1000 characters' });
+    }
+
+    // Validate compliance checklist
+    if (!checklistItems || !Array.isArray(checklistItems)) {
+      return res.status(400).json({
+        error: 'Approval checklist must be completed before approving',
+      });
+    }
+
+    const missingChecks = REQUIRED_CHECKS.filter(
+      (check) => !checklistItems.includes(check)
+    );
+
+    if (missingChecks.length > 0) {
+      return res.status(400).json({
+        error: 'All checklist items must be confirmed before approving',
+        missingChecks,
+      });
     }
 
     const eco = await prisma.eCO.findUnique({ where: { id } });
@@ -276,13 +304,15 @@ const approveECO = async (req, res) => {
           userId: req.user.id,
           approved: true,
           comment: comment || null,
+          checklistCompleted: true,
+          checklistItems: JSON.stringify(checklistItems),
         },
       }),
       prisma.auditLog.create({
         data: {
           ecoId: id,
           userId: req.user.id,
-          action: `'${eco.title}' approved by ${req.user.email}. Comment: ${comment || 'No comment'}`,
+          action: `'${eco.title}' approved by ${req.user.email}. Comment: ${comment || 'No comment'} — 5/5 compliance checks completed`,
           actionType: 'APPROVE',
           oldValue: JSON.stringify({ status: eco.status }),
           newValue: JSON.stringify({ status: 'APPROVED', comment: comment || null }),
@@ -521,8 +551,8 @@ const applyECO = async (req, res) => {
 const updateECO = async (req, res) => {
   try {
     const id = req.params.id;
-    const { 
-      title, effectiveDate, versionUpdate, 
+    const {
+      title, effectiveDate, versionUpdate,
       productChanges, bomComponentChanges,
       description, aiAnalysis, aiSummary, aiTags
     } = req.body;

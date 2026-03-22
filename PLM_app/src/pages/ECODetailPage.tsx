@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft, Package, Layers, ArrowRight, Pencil } from 'lucide-react';
+import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft, Package, Layers, ArrowRight, Pencil, Check, Lock, Loader2, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -40,7 +40,26 @@ export default function ECODetailPage() {
   const [dynamicStages, setDynamicStages] = useState<StageItem[]>([]);
   const [generatingImpact, setGeneratingImpact] = useState(false);
   const [impactData, setImpactData] = useState<any>(null);
+  const [approving, setApproving] = useState(false);
+  const [checklist, setChecklist] = useState({
+    reviewed_all_changes: false,
+    verified_technical_feasibility: false,
+    confirmed_no_compliance_issues: false,
+    checked_production_impact: false,
+    acknowledge_accountability: false,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const CHECKLIST_LABELS: Record<string, string> = {
+    reviewed_all_changes: 'I have reviewed all proposed changes in detail',
+    verified_technical_feasibility: 'I have verified the technical feasibility of these changes',
+    confirmed_no_compliance_issues: 'I confirm there are no regulatory or compliance issues',
+    checked_production_impact: 'I have assessed the impact on active production orders',
+    acknowledge_accountability: 'I understand I am accountable for this approval decision',
+  };
+
+  const allChecked = Object.values(checklist).every(Boolean);
+  const checkedItems = Object.entries(checklist).filter(([, v]) => v).map(([k]) => k);
 
   useEffect(() => {
     if (id) fetchECOById(id);
@@ -64,12 +83,41 @@ export default function ECODetailPage() {
       const response = await api.get(`/ai/impact-analysis/${id}`);
       setImpactData(response.data.data);
       toast.success('AI Impact Analysis generated!');
-      fetchECOById(id); // Refresh to get the cached analysis
+      fetchECOById(id);
     } catch (err: any) {
       toast.error('Failed to generate impact analysis: ' + (err.response?.data?.error || err.message));
     } finally {
       setGeneratingImpact(false);
     }
+  };
+
+  const handleApprove = async () => {
+    if (!allChecked || !id) return;
+    setApproving(true);
+    try {
+      await api.patch(`/ecos/${id}/approve`, {
+        comment,
+        checklistItems: checkedItems,
+      });
+      toast.success('ECO approved with 5/5 compliance checks recorded.');
+      await fetchECOById(id);
+      setComment('');
+      setChecklist({
+        reviewed_all_changes: false,
+        verified_technical_feasibility: false,
+        confirmed_no_compliance_issues: false,
+        checked_production_impact: false,
+        acknowledge_accountability: false,
+      });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Approval failed');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    await handleAction('reject');
   };
 
   if (isLoading) return <LoadingSpinner />;
@@ -477,18 +525,106 @@ export default function ECODetailPage() {
                 </Button>
               )}
               {canApprove && (
-                <>
-                  <Input placeholder="Add comment..." value={comment} onChange={e => setComment(e.target.value)} className="bg-muted border-border" />
+                <div className="space-y-4">
+                  {/* Compliance Checklist */}
+                  <div className="rounded-xl border border-success/30 bg-success/5 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-success/20 bg-success/10 flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4 text-success" />
+                      <div>
+                        <p className="text-sm font-semibold text-success">Pre-Approval Compliance Checklist</p>
+                        <p className="text-[11px] text-success/70">All items required · Creates legal accountability record</p>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {Object.entries(CHECKLIST_LABELS).map(([key, label]) => (
+                        <div
+                          key={key}
+                          className="flex items-start gap-3 cursor-pointer group"
+                          onClick={() => setChecklist(prev => ({ ...prev, [key]: !prev[key as keyof typeof prev] }))}
+                        >
+                          <div className={cn(
+                            'mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150',
+                            checklist[key as keyof typeof checklist]
+                              ? 'bg-success border-success shadow-[0_0_8px_rgba(34,197,94,0.4)]'
+                              : 'border-border group-hover:border-success/60'
+                          )}>
+                            {checklist[key as keyof typeof checklist] && (
+                              <Check className="h-2.5 w-2.5 text-white" />
+                            )}
+                          </div>
+                          <span className={cn(
+                            'text-xs leading-relaxed select-none transition-colors',
+                            checklist[key as keyof typeof checklist]
+                              ? 'text-foreground line-through decoration-muted-foreground/50'
+                              : 'text-muted-foreground group-hover:text-foreground'
+                          )}>
+                            {label}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Progress Bar */}
+                      <div className="pt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-success h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${(checkedItems.length / 5) * 100}%` }}
+                            />
+                          </div>
+                          <span className={cn("text-xs font-semibold tabular-nums",
+                            allChecked ? 'text-success' : 'text-muted-foreground'
+                          )}>
+                            {checkedItems.length}/5
+                          </span>
+                        </div>
+                        {!allChecked && (
+                          <p className="text-[11px] text-muted-foreground text-center">
+                            {5 - checkedItems.length} item{5 - checkedItems.length !== 1 ? 's' : ''} remaining before unlock
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Comment */}
+                  <Input
+                    placeholder="Add approval comment (optional)..."
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    className="bg-muted border-border"
+                  />
+
+                  {/* Action Buttons */}
                   <div className="flex gap-2">
-                    <Button onClick={() => handleAction('approve')} className="flex-1 bg-success hover:bg-success/90">
-                      <CheckCircle2 className="h-4 w-4 mr-2" />Approve
+                    <Button
+                      onClick={handleApprove}
+                      disabled={!allChecked || approving}
+                      className={cn(
+                        'flex-1 transition-all font-semibold',
+                        allChecked
+                          ? 'bg-success hover:bg-success/90 text-success-foreground shadow-[0_4px_12px_rgba(34,197,94,0.3)]'
+                          : 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                      )}
+                    >
+                      {approving ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Approving...</>
+                      ) : allChecked ? (
+                        <><CheckCircle2 className="h-4 w-4 mr-2" />Approve ECO</>
+                      ) : (
+                        <><Lock className="h-4 w-4 mr-2" />Complete Checklist to Approve</>
+                      )}
                     </Button>
-                    <Button onClick={() => handleAction('reject')} variant="destructive" className="flex-1">
-                      <XCircle className="h-4 w-4 mr-2" />Reject
+                    <Button
+                      variant="outline"
+                      onClick={handleReject}
+                      disabled={approving}
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />Reject
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Waiting for approval from Approver</p>
-                </>
+                </div>
               )}
               {canApply && (
                 <>
@@ -519,17 +655,25 @@ export default function ECODetailPage() {
               ) : (
                 <div className="space-y-3">
                   {eco.approvals.map((a, idx) => (
-                    <div key={a.id || idx} className="flex items-start gap-3">
+                    <div key={a.id || idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 border border-border">
                       <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-                        {a.userName.split(' ').map(n => n[0]).join('')}
+                        {a.userName.split(' ').map((n: string) => n[0]).join('')}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium">{a.userName}</span>
                           <StatusBadge status={a.action} />
+                          {a.checklistCompleted && (
+                            <span
+                              title="All compliance checks completed before approval"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-success/15 text-success text-[10px] font-bold rounded-md border border-success/30"
+                            >
+                              <Check className="h-2.5 w-2.5" />5/5 checks
+                            </span>
+                          )}
                         </div>
                         {a.comment && <p className="text-xs text-muted-foreground mt-1">{a.comment}</p>}
-                        <p className="text-xs text-muted-foreground">{a.date}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{a.date}</p>
                       </div>
                     </div>
                   ))}
