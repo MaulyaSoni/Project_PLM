@@ -9,10 +9,14 @@ exports.generateDescription = async (req, res) => {
       changes, versionUpdate, effectiveDate
     } = req.body;
 
-    if (!ecoTitle || !ecoType || !productId || !changes?.length) {
-      return res.status(400).json({
-        error: 'ecoTitle, ecoType, productId and changes are required'
-      });
+    if (!ecoTitle) {
+      return res.status(400).json({ error: 'An ECO Title is required before generating a description.' });
+    }
+    if (!productId) {
+      return res.status(400).json({ error: 'A valid Product must be selected first.' });
+    }
+    if (!changes || changes.length === 0) {
+      return res.status(400).json({ error: 'At least one staged change is required for the AI to analyze.' });
     }
 
     const product = await prisma.product.findUnique({

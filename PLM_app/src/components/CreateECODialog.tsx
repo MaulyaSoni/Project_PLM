@@ -176,7 +176,16 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   };
 
   const generateDescription = async () => {
-    if (!title || !type || !productId) return;
+    if (!title) {
+      toast.error('Please enter a title to generate a description.');
+      return;
+    }
+    if (!productId) {
+      toast.error('Please select a product to generate a description.');
+      return;
+    }
+    if (!type) return;
+
     setGeneratingDesc(true);
     try {
       const changes = type === 'PRODUCT'
@@ -192,6 +201,12 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
               newValue: c.newQty,
               changeType: c.changeType
             }));
+
+      if (changes.length === 0 && type === 'BOM') {
+        toast.error('Please stage at least one BOM component change before generating the description.');
+        setGeneratingDesc(false);
+        return;
+      }
 
       const response = await api.post('/ai/eco-description', {
         ecoTitle: title,
