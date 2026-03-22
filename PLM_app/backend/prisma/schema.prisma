@@ -138,7 +138,11 @@ model ECO {
   status             ECOStageStatus  @default(NEW)
   productChanges     Json?
   bomComponentChanges Json?
-  createdAt          DateTime        @default(now())
+  description         String?         @db.Text
+  aiAnalysis          String?         @map("ai_analysis") // cached JSON from impact analysis
+  aiSummary           String?         @map("ai_summary")  // cached one-line summary
+  aiTags              String?         @map("ai_tags")     // cached JSON array of tags
+  createdAt           DateTime        @default(now())
 
   product            Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   bom                BOM?            @relation(fields: [bomId], references: [id], onDelete: SetNull)

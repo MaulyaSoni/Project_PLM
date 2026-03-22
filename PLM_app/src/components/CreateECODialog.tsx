@@ -13,11 +13,15 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, Layers, ArrowRight, Plus, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Package, Layers, ArrowRight, Plus, Trash2, Sparkles, AlertTriangle, ShieldCheck, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ECO, ECOType, ECOProductChange, ECOBOMComponentChange } from '@/data/mockData';
 import { useEffect } from 'react';
+import api from '@/services/api';
 
 interface Props {
   open: boolean;
@@ -40,6 +44,14 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const [versionUpdate, setVersionUpdate] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // AI Description fields
+  const [description, setDescription] = useState('');
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiTags, setAiTags] = useState<string[]>([]);
+  const [generatingDesc, setGeneratingDesc] = useState(false);
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
+  const [conflictData, setConflictData] = useState<any>(null);
 
   // Product changes
   const [newSalePrice, setNewSalePrice] = useState('');
@@ -87,6 +99,9 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
           changeType: c.changeType,
         })));
       }
+      if (editEco.description) setDescription(editEco.description);
+      if (editEco.aiSummary) setAiSummary(editEco.aiSummary);
+      if (editEco.aiTags) setAiTags(editEco.aiTags);
       return;
     }
 
@@ -112,6 +127,8 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     setStep(1); setTitle(''); setType(''); setProductId(''); setBomId('');
     setEffectiveDate(''); setVersionUpdate(true); setConfirmed(false);
     setNewSalePrice(''); setNewCostPrice(''); setBomChanges([]);
+    setDescription(''); setAiSummary(''); setAiTags([]);
+    setConflictData(null);
     setIsSubmitting(false);
   };
 
@@ -125,6 +142,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     !versionUpdate ||
     !!newSalePrice ||
     !!newCostPrice ||
+    !!description ||
     bomChanges.length > 0;
 
   useEffect(() => {
@@ -154,6 +172,84 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     const b = boms.find(x => x.id === bid);
     if (b) {
       setBomChanges(b.components.map(c => ({ name: c.name, oldQty: String(c.quantity), newQty: String(c.quantity), changeType: 'UNCHANGED' })));
+    }
+  };
+
+  const generateDescription = async () => {
+    if (!title || !type || !productId) return;
+    setGeneratingDesc(true);
+    try {
+      const changes = type === 'PRODUCT'
+        ? [
+            { fieldName: 'Sale Price', oldValue: selectedProduct?.salePrice, newValue: Number(newSalePrice), changeType: 'CHANGED' },
+            { fieldName: 'Cost Price', oldValue: selectedProduct?.costPrice, newValue: Number(newCostPrice), changeType: 'CHANGED' },
+          ]
+        : bomChanges
+            .filter(c => c.changeType !== 'UNCHANGED')
+            .map(c => ({
+              fieldName: c.name,
+              oldValue: c.oldQty,
+              newValue: c.newQty,
+              changeType: c.changeType
+            }));
+
+      const response = await api.post('/ai/eco-description', {
+        ecoTitle: title,
+        ecoType: type,
+        productId,
+        changes,
+        versionUpdate,
+        effectiveDate: effectiveDate || null
+      });
+
+      const { description: aiDesc, summary, tags } = response.data.data;
+      setDescription(aiDesc);
+      setAiSummary(summary);
+      setAiTags(tags);
+      toast.success('AI description generated!');
+    } catch (err: any) {
+      toast.error('Failed to generate description: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setGeneratingDesc(false);
+    }
+  };
+
+  const checkConflicts = async () => {
+    if (!productId) return;
+    setCheckingConflicts(true);
+    try {
+      const changes = type === 'PRODUCT'
+        ? [
+            { fieldName: 'Sale Price', oldValue: selectedProduct?.salePrice, newValue: Number(newSalePrice), changeType: 'CHANGED' },
+            { fieldName: 'Cost Price', oldValue: selectedProduct?.costPrice, newValue: Number(newCostPrice), changeType: 'CHANGED' },
+          ]
+        : bomChanges
+            .filter(c => c.changeType !== 'UNCHANGED')
+            .map(c => ({
+              fieldName: c.name,
+              oldValue: c.oldQty,
+              newValue: c.newQty,
+              changeType: c.changeType
+            }));
+
+      const response = await api.post('/ai/conflict-detection', {
+        ecoTitle: title,
+        ecoType: type,
+        productId,
+        changes,
+        currentEcoId: editEco?.id
+      });
+
+      setConflictData(response.data.data);
+      if (response.data.data.has_conflicts) {
+        toast.warning(`AI detected ${response.data.data.conflict_count} potential conflicts!`);
+      } else {
+        toast.success('No conflicts detected by AI.');
+      }
+    } catch (err: any) {
+      console.error('Conflict detection error:', err);
+    } finally {
+      setCheckingConflicts(false);
     }
   };
 
@@ -193,6 +289,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       if (editEco) {
         await updateECO(editEco.id, {
           title, effectiveDate, versionUpdate, productChanges, bomComponentChanges,
+          description, aiSummary, aiTags,
         });
         toast.success('ECO updated');
         onOpenChange(false);
@@ -203,6 +300,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
           bomId: bomId || undefined, assignedTo: user.id, assignedToName: user.name,
           effectiveDate, versionUpdate, createdBy: user.id, createdByName: user.name,
           productChanges, bomComponentChanges,
+          description, aiSummary, aiTags,
         });
         toast.success('ECO created');
         onOpenChange(false);
@@ -396,6 +494,75 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 )}
               </CardContent>
             </Card>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>ECO Description</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 border-primary/50 text-primary hover:bg-primary/10"
+                  onClick={generateDescription}
+                  disabled={generatingDesc || !title || !productId}
+                >
+                  <Sparkles className={cn("h-3.5 w-3.5", generatingDesc && "animate-pulse")} />
+                  {generatingDesc ? 'Generating...' : 'AI Generate'}
+                </Button>
+              </div>
+              <Textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Professional description of the changes..."
+                className="bg-muted border-border min-h-[100px] text-sm"
+              />
+              {aiTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {aiTags.map((tag, i) => (
+                    <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  AI Conflict Detection
+                  {conflictData?.has_conflicts ? (
+                    <Badge variant="destructive" className="h-4 px-1 text-[10px] animate-pulse">Conflicts Found</Badge>
+                  ) : conflictData ? (
+                    <Badge variant="outline" className="h-4 px-1 text-[10px] bg-success/10 text-success border-success/30">Clear</Badge>
+                  ) : null}
+                </Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 hover:bg-primary/10"
+                  onClick={checkConflicts}
+                  disabled={checkingConflicts || !productId}
+                >
+                  <ShieldCheck className={cn("h-3.5 w-3.5", checkingConflicts && "animate-spin")} />
+                  {checkingConflicts ? 'Checking...' : 'Check Conflicts'}
+                </Button>
+              </div>
+
+              {conflictData?.has_conflicts && (
+                <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-xl space-y-2">
+                  {conflictData.conflicts.map((c: any, i: number) => (
+                    <div key={i} className="flex gap-2 text-xs">
+                      <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-destructive">Conflict with "{c.conflicting_eco_title}"</p>
+                        <p className="text-muted-foreground">{c.description}</p>
+                        <p className="text-primary font-medium mt-1">💡 {c.suggestion}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               <Checkbox id="confirm" checked={confirmed} onCheckedChange={v => setConfirmed(!!v)} />

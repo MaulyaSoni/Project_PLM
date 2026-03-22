@@ -77,6 +77,10 @@ const mapECO = (eco) => {
     createdAt: toDateOnly(eco.createdAt),
     productChanges: eco.productChanges || undefined,
     bomComponentChanges: eco.bomComponentChanges || undefined,
+    aiAnalysis: eco.aiAnalysis || undefined,
+    aiSummary: eco.aiSummary || undefined,
+    aiTags: eco.aiTags ? JSON.parse(eco.aiTags) : undefined,
+    description: eco.description || undefined,
     approvals: eco.approvals.map((a) => ({
       id: a.id,
       userId: a.userId,

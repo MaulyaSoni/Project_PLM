@@ -84,6 +84,9 @@ const createECO = async (req, res) => {
       versionUpdate,
       productChanges,
       bomComponentChanges,
+      description,
+      aiSummary,
+      aiTags,
     } = req.body;
 
     const normalizedTitle = String(title || '').trim();
@@ -173,6 +176,9 @@ const createECO = async (req, res) => {
         status: initialStatus,
         productChanges: productChanges || null,
         bomComponentChanges: bomComponentChanges || null,
+        description: description || null,
+        aiSummary: aiSummary || null,
+        aiTags: Array.isArray(aiTags) ? JSON.stringify(aiTags) : (aiTags || null),
         auditLogs: {
           create: isAdmin ? [
             {
@@ -515,7 +521,11 @@ const applyECO = async (req, res) => {
 const updateECO = async (req, res) => {
   try {
     const id = req.params.id;
-    const { title, effectiveDate, versionUpdate, productChanges, bomComponentChanges } = req.body;
+    const { 
+      title, effectiveDate, versionUpdate, 
+      productChanges, bomComponentChanges,
+      description, aiAnalysis, aiSummary, aiTags
+    } = req.body;
 
     const eco = await prisma.eCO.findUnique({ where: { id } });
     if (!eco) return res.status(404).json({ error: 'ECO not found' });
@@ -535,6 +545,10 @@ const updateECO = async (req, res) => {
         versionUpdate: versionUpdate !== undefined ? versionUpdate : eco.versionUpdate,
         productChanges: productChanges ?? eco.productChanges,
         bomComponentChanges: bomComponentChanges ?? eco.bomComponentChanges,
+        description: description ?? eco.description,
+        aiAnalysis: aiAnalysis ?? eco.aiAnalysis,
+        aiSummary: aiSummary ?? eco.aiSummary,
+        aiTags: aiTags ? (Array.isArray(aiTags) ? JSON.stringify(aiTags) : aiTags) : eco.aiTags,
       },
       include: includeShape,
     });

@@ -19,9 +19,12 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
 import CreateECODialog from '@/components/CreateECODialog';
+import api from '@/services/api';
 
 const legacyStages = ['NEW', 'IN_REVIEW', 'DONE'] as const;
 const defaultStageLabels: Record<string, string> = { NEW: 'New', IN_REVIEW: 'In Review', DONE: 'Done' };
+
+import { AlertTriangle, Sparkles, TrendingUp, Info } from 'lucide-react';
 
 export default function ECODetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,12 +38,39 @@ export default function ECODetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [dynamicStages, setDynamicStages] = useState<StageItem[]>([]);
+  const [generatingImpact, setGeneratingImpact] = useState(false);
+  const [impactData, setImpactData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (id) fetchECOById(id);
     settingsService.getStages().then(setDynamicStages).catch(console.error);
   }, [id, fetchECOById]);
+
+  useEffect(() => {
+    if (currentECO?.aiAnalysis) {
+      try {
+        setImpactData(JSON.parse(currentECO.aiAnalysis));
+      } catch (e) {
+        console.error('Failed to parse AI Analysis:', e);
+      }
+    }
+  }, [currentECO]);
+
+  const generateImpact = async () => {
+    if (!id) return;
+    setGeneratingImpact(true);
+    try {
+      const response = await api.get(`/ai/impact-analysis/${id}`);
+      setImpactData(response.data.data);
+      toast.success('AI Impact Analysis generated!');
+      fetchECOById(id); // Refresh to get the cached analysis
+    } catch (err: any) {
+      toast.error('Failed to generate impact analysis: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setGeneratingImpact(false);
+    }
+  };
 
   if (isLoading) return <LoadingSpinner />;
   if (!currentECO) {
@@ -348,6 +378,95 @@ export default function ECODetailPage() {
 
         {/* Right — Actions */}
         <div className="col-span-2 space-y-4">
+          {/* AI Impact Analysis */}
+          <Card className="bg-card border-border overflow-hidden">
+            <div className="bg-primary/5 px-4 py-3 border-b border-border flex items-center justify-between">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" /> AI Risk & Impact Assessment
+              </h3>
+              {!impactData && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-[10px] uppercase font-bold tracking-wider hover:bg-primary/10"
+                  onClick={generateImpact}
+                  disabled={generatingImpact}
+                >
+                  {generatingImpact ? 'Analyzing...' : 'Analyze Now'}
+                </Button>
+              )}
+            </div>
+            <CardContent className="p-4 space-y-4">
+              {impactData ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Risk Level</p>
+                      <Badge className={cn(
+                        "font-bold px-2 py-0.5",
+                        impactData.risk_level === 'LOW' && 'bg-success/20 text-success border-0',
+                        impactData.risk_level === 'MEDIUM' && 'bg-warning/20 text-warning border-0',
+                        impactData.risk_level === 'HIGH' && 'bg-destructive/20 text-destructive border-0',
+                        impactData.risk_level === 'CRITICAL' && 'bg-destructive text-white border-0'
+                      )}>
+                        {impactData.risk_level}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Urgency</p>
+                      <div className="flex items-center gap-1 justify-end">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+                          <div key={i} className={cn("h-1 w-2 rounded-full", i <= impactData.urgency_score ? 'bg-primary' : 'bg-muted')} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-muted/30 rounded-xl border border-border/50">
+                    <p className="text-xs font-medium italic text-foreground/80">"{impactData.risk_summary}"</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
+                      <TrendingUp className="h-3 w-3" /> Estimated Impact
+                    </p>
+                    <p className="text-xs font-semibold">{impactData.estimated_impact}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3" /> Key Considerations
+                    </p>
+                    <ul className="space-y-1">
+                      {impactData.key_considerations?.map((item: string, i: number) => (
+                        <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                          <span className="h-1 w-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
+                      <Info className="h-3 w-3" /> AI Recommendation
+                    </p>
+                    <div className="bg-primary/5 p-3 rounded-xl border border-primary/20">
+                      <p className="text-xs font-bold text-primary">{impactData.recommendation}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto opacity-50">
+                    <Sparkles className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">AI has not yet performed impact analysis for this ECO.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Stage Actions */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-3"><CardTitle className="text-base">Actions</CardTitle></CardHeader>

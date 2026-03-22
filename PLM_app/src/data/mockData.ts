@@ -119,6 +119,10 @@ export interface ECO {
   createdAt: string;
   productChanges?: ECOProductChange[];
   bomComponentChanges?: ECOBOMComponentChange[];
+  aiAnalysis?: string;
+  aiSummary?: string;
+  aiTags?: string[];
+  description?: string;
   approvals: ECOApproval[];
   auditLog: AuditEntry[];
 }
