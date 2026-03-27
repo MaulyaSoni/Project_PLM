@@ -29,4 +29,8 @@ export const reportsService = {
     const { data } = await api.get('/reports/audit-log');
     return data.data;
   },
+  async getAiResults() {
+    const { data } = await api.get('/ai/results');
+    return data;
+  },
 };

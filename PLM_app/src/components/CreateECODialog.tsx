@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Package, Layers, ArrowRight, Plus, Trash2, Sparkles, AlertTriangle, ShieldCheck, Info } from 'lucide-react';
+import { Package, Layers, ArrowRight, Plus, Trash2, Sparkles, AlertTriangle, ShieldCheck, Info, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ECO, ECOType, ECOProductChange, ECOBOMComponentChange } from '@/data/mockData';
@@ -33,6 +33,38 @@ interface Props {
   /** When provided, the dialog operates in edit mode, pre-filling fields from the ECO. */
   eco?: ECO;
 }
+
+type ConflictData = {
+  has_conflicts?: boolean;
+  conflict_count?: number;
+  conflicts?: Array<{
+    conflicting_eco_title?: string;
+    description?: string;
+    suggestion?: string;
+  }>;
+};
+
+type TemplateSuggestion = {
+  has_suggestion?: boolean;
+  confidence?: string;
+  insight?: string;
+  pattern_detected?: string;
+  based_on_ecos?: number;
+  suggested_title_prefix?: string;
+  suggested_changes?: Array<{
+    fieldName?: string;
+    oldValue?: string | number;
+    newValue?: string | number;
+    changeType?: string;
+  }>;
+};
+
+type QualityScore = {
+  blocking?: boolean;
+  total_score?: number;
+  summary?: string;
+  improvements?: string[];
+};
 
 export default function CreateECODialog({ open, onOpenChange, initialType, initialProductId, initialBOMId, initialTitle, eco: editEco }: Props) {
   const [step, setStep] = useState(1);
@@ -51,7 +83,11 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const [aiTags, setAiTags] = useState<string[]>([]);
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const [checkingConflicts, setCheckingConflicts] = useState(false);
-  const [conflictData, setConflictData] = useState<any>(null);
+  const [conflictData, setConflictData] = useState<ConflictData | null>(null);
+  const [templateSuggestion, setTemplateSuggestion] = useState<TemplateSuggestion | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [qualityScore, setQualityScore] = useState<QualityScore | null>(null);
+  const [scoringDraft, setScoringDraft] = useState(false);
 
   // Product changes
   const [newSalePrice, setNewSalePrice] = useState('');
@@ -119,6 +155,11 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     }
   }, [open, initialType, initialProductId, initialBOMId, initialTitle, editEco]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!open || !productId || !type) return;
+    fetchTemplateSuggestion();
+  }, [open, productId, type]);
+
   const selectedProduct = products.find(p => p.id === productId);
   const selectedBOM = boms.find(b => b.id === bomId);
   const filteredBOMs = boms.filter(b => b.productId === productId && b.status === 'ACTIVE');
@@ -129,7 +170,84 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     setNewSalePrice(''); setNewCostPrice(''); setBomChanges([]);
     setDescription(''); setAiSummary(''); setAiTags([]);
     setConflictData(null);
+    setTemplateSuggestion(null);
+    setLoadingTemplate(false);
+    setQualityScore(null);
+    setScoringDraft(false);
     setIsSubmitting(false);
+  };
+
+  const getDraftChanges = () => {
+    if (type === 'PRODUCT') {
+      return [
+        { fieldName: 'Sale Price', oldValue: selectedProduct?.salePrice, newValue: Number(newSalePrice), changeType: 'CHANGED' },
+        { fieldName: 'Cost Price', oldValue: selectedProduct?.costPrice, newValue: Number(newCostPrice), changeType: 'CHANGED' },
+      ];
+    }
+
+    return bomChanges
+      .filter(c => c.changeType !== 'UNCHANGED')
+      .map(c => ({
+        fieldName: c.name,
+        oldValue: c.oldQty,
+        newValue: c.newQty,
+        changeType: c.changeType
+      }));
+  };
+
+  const fetchTemplateSuggestion = async () => {
+    setLoadingTemplate(true);
+    try {
+      const res = await api.get('/ai/template-suggestion', {
+        params: { productId, ecoType: type }
+      });
+      const suggestion = res.data?.data;
+      if (suggestion?.has_suggestion) {
+        setTemplateSuggestion(suggestion);
+      } else {
+        setTemplateSuggestion(null);
+      }
+    } catch (e) {
+      console.error('Template suggestion failed:', e);
+      setTemplateSuggestion(null);
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
+  const handleStep2Next = async () => {
+    setScoringDraft(true);
+    try {
+      const res = await api.post('/ai/quality-score', {
+        ecoId: editEco?.id || null,
+        title,
+        type,
+        productId,
+        changes: getDraftChanges(),
+        description,
+        effectiveDate,
+        versionUpdate,
+      });
+
+      const score = res.data?.data;
+      setQualityScore(score);
+
+      if (score?.blocking) {
+        toast.error('ECO draft is blocked. Improve quality before continuing.');
+        return;
+      }
+
+      if ((score?.total_score || 0) <= 5) {
+        toast.warning('Quality score is low. Review suggestions before continuing.');
+        return;
+      }
+
+      setStep(3);
+    } catch {
+      setStep(3);
+    } finally {
+      setScoringDraft(false);
+    }
   };
 
   const isDirty =
@@ -188,19 +306,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
     setGeneratingDesc(true);
     try {
-      const changes = type === 'PRODUCT'
-        ? [
-            { fieldName: 'Sale Price', oldValue: selectedProduct?.salePrice, newValue: Number(newSalePrice), changeType: 'CHANGED' },
-            { fieldName: 'Cost Price', oldValue: selectedProduct?.costPrice, newValue: Number(newCostPrice), changeType: 'CHANGED' },
-          ]
-        : bomChanges
-            .filter(c => c.changeType !== 'UNCHANGED')
-            .map(c => ({
-              fieldName: c.name,
-              oldValue: c.oldQty,
-              newValue: c.newQty,
-              changeType: c.changeType
-            }));
+      const changes = getDraftChanges();
 
       if (changes.length === 0 && type === 'BOM') {
         toast.error('Please stage at least one BOM component change before generating the description.');
@@ -222,8 +328,9 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       setAiSummary(summary);
       setAiTags(tags);
       toast.success('AI description generated!');
-    } catch (err: any) {
-      toast.error('Failed to generate description: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error('Failed to generate description: ' + (apiErr.response?.data?.error || apiErr.message || 'Unknown error'));
     } finally {
       setGeneratingDesc(false);
     }
@@ -233,19 +340,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     if (!productId) return;
     setCheckingConflicts(true);
     try {
-      const changes = type === 'PRODUCT'
-        ? [
-            { fieldName: 'Sale Price', oldValue: selectedProduct?.salePrice, newValue: Number(newSalePrice), changeType: 'CHANGED' },
-            { fieldName: 'Cost Price', oldValue: selectedProduct?.costPrice, newValue: Number(newCostPrice), changeType: 'CHANGED' },
-          ]
-        : bomChanges
-            .filter(c => c.changeType !== 'UNCHANGED')
-            .map(c => ({
-              fieldName: c.name,
-              oldValue: c.oldQty,
-              newValue: c.newQty,
-              changeType: c.changeType
-            }));
+      const changes = getDraftChanges();
 
       const response = await api.post('/ai/conflict-detection', {
         ecoTitle: title,
@@ -261,7 +356,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       } else {
         toast.success('No conflicts detected by AI.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Conflict detection error:', err);
     } finally {
       setCheckingConflicts(false);
@@ -388,6 +483,58 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
               </Select>
             </div>
 
+            {loadingTemplate && (
+              <p className="text-xs text-muted-foreground">Loading AI template suggestion...</p>
+            )}
+
+            {templateSuggestion?.has_suggestion && (
+              <div className="rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-400" />
+                    <span className="text-sm font-medium text-blue-300">AI Template Suggestion</span>
+                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400/30">
+                      {templateSuggestion.confidence} confidence
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTemplateSuggestion(null)}
+                    className="text-slate-500 h-6 w-6 p-0"
+                  >
+                    x
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-400">{templateSuggestion.insight}</p>
+                <p className="text-xs text-slate-500 italic">
+                  Pattern: {templateSuggestion.pattern_detected} · Based on {templateSuggestion.based_on_ecos} previous ECOs
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (templateSuggestion.suggested_changes?.length > 0 && type === 'BOM') {
+                      const suggested = templateSuggestion.suggested_changes.map((c) => ({
+                        name: c.fieldName,
+                        oldQty: c.oldValue ? String(c.oldValue) : '0',
+                        newQty: c.newValue ? String(c.newValue) : '',
+                        changeType: c.changeType || 'CHANGED',
+                      }));
+                      setBomChanges(suggested);
+                    }
+                    if (!title) {
+                      setTitle(templateSuggestion.suggested_title_prefix || title);
+                    }
+                    toast.success('Template applied. Review and modify before submitting.');
+                    setTemplateSuggestion(null);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 h-7 text-xs"
+                >
+                  Apply Template
+                </Button>
+              </div>
+            )}
+
             {type === 'BOM' && productId && (
               <div className="space-y-2">
                 <Label>BOM</Label>
@@ -468,9 +615,79 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
               </div>
             )}
 
+            {qualityScore && (
+              <div className={cn(
+                'rounded-lg border p-3 space-y-3',
+                qualityScore.blocking
+                  ? 'border-red-500/40 bg-red-950/20'
+                  : qualityScore.total_score <= 5
+                    ? 'border-amber-500/40 bg-amber-950/20'
+                    : 'border-green-500/40 bg-green-950/20'
+              )}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-white flex items-center gap-2">
+                    <Star className="h-4 w-4" />
+                    ECO Quality Score
+                  </span>
+                  <span className={cn(
+                    'text-2xl font-bold',
+                    qualityScore.blocking
+                      ? 'text-red-400'
+                      : qualityScore.total_score <= 5
+                        ? 'text-amber-400'
+                        : 'text-green-400'
+                  )}>
+                    {qualityScore.total_score}/10
+                  </span>
+                </div>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'h-2 flex-1 rounded-sm transition-all',
+                        i < qualityScore.total_score
+                          ? qualityScore.blocking
+                            ? 'bg-red-400'
+                            : qualityScore.total_score <= 5
+                              ? 'bg-amber-400'
+                              : 'bg-green-400'
+                          : 'bg-slate-700'
+                      )}
+                    />
+                  ))}
+                </div>
+
+                <p className="text-xs text-slate-300">{qualityScore.summary}</p>
+
+                {qualityScore.improvements?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Suggestions:</p>
+                    {qualityScore.improvements.map((imp: string, i: number) => (
+                      <p key={i} className="text-xs text-slate-400">- {imp}</p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  {!qualityScore.blocking && (
+                    <Button size="sm" onClick={() => setStep(3)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                      Continue to Review
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setQualityScore(null)} className="border-slate-600">
+                    Improve First
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={() => setStep(3)}>Next</Button>
+              <Button onClick={handleStep2Next} disabled={scoringDraft}>
+                {scoringDraft ? 'Scoring...' : 'Next'}
+              </Button>
             </div>
           </div>
         )}
@@ -565,7 +782,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
               {conflictData?.has_conflicts && (
                 <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-xl space-y-2">
-                  {conflictData.conflicts.map((c: any, i: number) => (
+                  {conflictData.conflicts.map((c, i: number) => (
                     <div key={i} className="flex gap-2 text-xs">
                       <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
                       <div>

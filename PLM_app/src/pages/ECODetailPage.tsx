@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft, Package, Layers, ArrowRight, Pencil, Check, Lock, Loader2, ClipboardCheck } from 'lucide-react';
+import { ArrowUp, ArrowDown, CheckCircle2, XCircle, Clock, Send, Play, ChevronLeft, Package, Layers, ArrowRight, Pencil, Check, Lock, Loader2, ClipboardCheck, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/EmptyState';
@@ -25,6 +25,39 @@ const legacyStages = ['NEW', 'IN_REVIEW', 'DONE'] as const;
 const defaultStageLabels: Record<string, string> = { NEW: 'New', IN_REVIEW: 'In Review', DONE: 'Done' };
 
 import { AlertTriangle, Sparkles, TrendingUp, Info } from 'lucide-react';
+
+type ImpactData = {
+  risk_level?: string;
+  urgency_score?: number;
+  risk_summary?: string;
+  estimated_impact?: string;
+  key_considerations?: string[];
+  recommendation?: string;
+};
+
+type ComplexityData = {
+  complexity_level?: string;
+  estimated_approval_days_range?: string;
+  summary?: string;
+  acceleration_tips?: string[];
+  risks?: string[];
+};
+
+type PrecedentItem = {
+  eco_title?: string;
+  similarity_score?: number;
+  approver_comment?: string;
+  key_lesson?: string;
+  days_to_approve?: number;
+};
+
+type PrecedentsData = {
+  has_precedents?: boolean;
+  pattern_summary?: string;
+  precedents?: PrecedentItem[];
+  recommendation?: string;
+  reason?: string;
+};
 
 export default function ECODetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +72,11 @@ export default function ECODetailPage() {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [dynamicStages, setDynamicStages] = useState<StageItem[]>([]);
   const [generatingImpact, setGeneratingImpact] = useState(false);
-  const [impactData, setImpactData] = useState<any>(null);
+  const [impactData, setImpactData] = useState<ImpactData | null>(null);
+  const [complexity, setComplexity] = useState<ComplexityData | null>(null);
+  const [loadingComplexity, setLoadingComplexity] = useState(false);
+  const [precedents, setPrecedents] = useState<PrecedentsData | null>(null);
+  const [loadingPrecedents, setLoadingPrecedents] = useState(false);
   const [approving, setApproving] = useState(false);
   const [checklist, setChecklist] = useState({
     reviewed_all_changes: false,
@@ -76,6 +113,34 @@ export default function ECODetailPage() {
     }
   }, [currentECO]);
 
+  useEffect(() => {
+    if (currentECO?.aiComplexityData) {
+      try {
+        setComplexity(JSON.parse(currentECO.aiComplexityData));
+      } catch {
+        setComplexity(null);
+      }
+      return;
+    }
+    if (currentECO?.status && currentECO.status !== 'NEW') {
+      loadComplexity();
+    }
+  }, [currentECO?.id, currentECO?.status, currentECO?.aiComplexityData]);
+
+  useEffect(() => {
+    if (currentECO?.aiPrecedents) {
+      try {
+        setPrecedents(JSON.parse(currentECO.aiPrecedents));
+      } catch {
+        setPrecedents(null);
+      }
+      return;
+    }
+    if (currentECO?.status === 'IN_REVIEW' && (user?.role === 'APPROVER' || user?.role === 'ADMIN')) {
+      loadPrecedents();
+    }
+  }, [currentECO?.id, currentECO?.status, currentECO?.aiPrecedents, user?.role]);
+
   const generateImpact = async () => {
     if (!id) return;
     setGeneratingImpact(true);
@@ -84,11 +149,45 @@ export default function ECODetailPage() {
       setImpactData(response.data.data);
       toast.success('AI Impact Analysis generated!');
       fetchECOById(id);
-    } catch (err: any) {
-      toast.error('Failed to generate impact analysis: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error('Failed to generate impact analysis: ' + (apiErr.response?.data?.error || apiErr.message || 'Unknown error'));
     } finally {
       setGeneratingImpact(false);
     }
+  };
+
+  const loadComplexity = async () => {
+    if (!id || !currentECO) return;
+    setLoadingComplexity(true);
+    try {
+      const response = await api.get(`/ai/complexity/${id}`);
+      setComplexity(response.data.data);
+    } catch (e) {
+      console.error('Complexity load failed:', e);
+    } finally {
+      setLoadingComplexity(false);
+    }
+  };
+
+  const loadPrecedents = async () => {
+    if (!id || !currentECO) return;
+    setLoadingPrecedents(true);
+    try {
+      const response = await api.get(`/ai/precedents/${id}`);
+      setPrecedents(response.data.data);
+    } catch (e) {
+      console.error('Precedents load failed:', e);
+    } finally {
+      setLoadingPrecedents(false);
+    }
+  };
+
+  const COMPLEXITY_COLORS: Record<string, { text: string; border: string; bg: string }> = {
+    SIMPLE: { text: 'text-green-400', border: 'border-green-500/30', bg: 'bg-green-950/20' },
+    MODERATE: { text: 'text-blue-400', border: 'border-blue-500/30', bg: 'bg-blue-950/20' },
+    COMPLEX: { text: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-950/20' },
+    CRITICAL: { text: 'text-red-400', border: 'border-red-500/30', bg: 'bg-red-950/20' },
   };
 
   const handleApprove = async () => {
@@ -109,8 +208,9 @@ export default function ECODetailPage() {
         checked_production_impact: false,
         acknowledge_accountability: false,
       });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Approval failed');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } } };
+      toast.error(apiErr.response?.data?.error || 'Approval failed');
     } finally {
       setApproving(false);
     }
@@ -514,6 +614,88 @@ export default function ECODetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {loadingComplexity && (
+            <Card className="bg-card border-border">
+              <CardContent className="p-4 text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Calculating complexity estimate...
+              </CardContent>
+            </Card>
+          )}
+
+          {complexity && (
+            <Card className={cn(
+              'border',
+              COMPLEXITY_COLORS[complexity.complexity_level]?.bg || 'bg-card',
+              COMPLEXITY_COLORS[complexity.complexity_level]?.border || 'border-border'
+            )}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-slate-400" />
+                  Complexity Estimate
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Badge className={COMPLEXITY_COLORS[complexity.complexity_level]?.text || ''}>
+                    {complexity.complexity_level}
+                  </Badge>
+                  <span className="text-xs text-slate-400">~{complexity.estimated_approval_days_range} days</span>
+                </div>
+                <p className="text-xs text-slate-300">{complexity.summary}</p>
+                {(complexity.acceleration_tips || []).slice(0, 2).map((tip: string, i: number) => (
+                  <p key={i} className="text-xs text-slate-400">Tip: {tip}</p>
+                ))}
+                {(complexity.risks || []).slice(0, 1).map((risk: string, i: number) => (
+                  <p key={i} className="text-xs text-amber-400">Risk: {risk}</p>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {(user?.role === 'APPROVER' || user?.role === 'ADMIN') && eco?.status === 'IN_REVIEW' && (
+            <Card className="border-purple-500/30 bg-purple-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-purple-400" />
+                  Approval Precedents
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingPrecedents ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Searching historical ECOs...
+                  </div>
+                ) : precedents?.has_precedents ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-300">{precedents.pattern_summary}</p>
+                    {(precedents.precedents || []).slice(0, 2).map((p: PrecedentItem, i: number) => (
+                      <div key={i} className="rounded border border-slate-700/50 bg-slate-900/50 p-2 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-200 truncate">{p.eco_title}</span>
+                          <Badge className="text-xs bg-green-900/40 text-green-400 border-green-500/30">
+                            {p.similarity_score}% match
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-400 italic">"{p.approver_comment}"</p>
+                        <p className="text-xs text-purple-400">Lesson: {p.key_lesson}</p>
+                        <p className="text-xs text-slate-500">Approved in {p.days_to_approve} day(s)</p>
+                      </div>
+                    ))}
+                    {precedents.recommendation && (
+                      <div className="rounded bg-purple-900/30 p-2">
+                        <p className="text-xs text-purple-300">{precedents.recommendation}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">{precedents?.reason || 'No similar ECOs found in history'}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Stage Actions */}
           <Card className="bg-card border-border">

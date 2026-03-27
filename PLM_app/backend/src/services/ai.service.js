@@ -1,12 +1,33 @@
 const Groq = require('groq-sdk');
+const { prisma } = require('../lib/prisma');
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
 // Using a supported Groq model like llama-3.3-70b-versatile or llama3-70b-8192
-const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-const FALLBACK_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+const MODEL = process.env.GROQ_MODEL || 'llama-3.1-70b-versatile';
+const FALLBACK_MODELS = ['llama-3.1-70b-versatile', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+
+async function storeAiResult({ ecoId, userId, featureType, input, output, latencyMs, cached }) {
+  try {
+    await prisma.aiResult.create({
+      data: {
+        ecoId: ecoId || null,
+        userId: userId || null,
+        featureType,
+        input: JSON.stringify(input || {}),
+        output: JSON.stringify(output || {}),
+        latencyMs: latencyMs || null,
+        cached: !!cached,
+        modelUsed: MODEL,
+      },
+    });
+  } catch (e) {
+    // Never let storage failure break the main flow
+    console.error('AiResult storage failed:', e.message);
+  }
+}
 
 // ─────────────────────────────────────────────
 // SHARED HELPER — call Groq and parse JSON back
@@ -125,6 +146,8 @@ function fallbackConflicts(openECOs) {
 // FEATURE 1 — ECO DESCRIPTION GENERATOR
 // ═══════════════════════════════════════════════════════
 async function generateECODescription({
+  ecoId,
+  userId,
   ecoTitle,
   ecoType,           // 'PRODUCT' | 'BOM'
   productName,
@@ -180,17 +203,34 @@ ${changesText}
 Write a professional ECO description explaining these changes and their business/operational significance.
 `.trim();
 
+  const start = Date.now();
+  let result;
+
   try {
-    return await callGroq(systemPrompt, userPrompt, 0.5);
+    result = await callGroq(systemPrompt, userPrompt, 0.5);
   } catch {
-    return fallbackDescription({ ecoTitle, ecoType, productName, changes, versionUpdate, effectiveDate });
+    result = fallbackDescription({ ecoTitle, ecoType, productName, changes, versionUpdate, effectiveDate });
   }
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'DESCRIPTION',
+    input: { ecoTitle, ecoType, productName, changeCount: changes?.length || 0 },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════
 // FEATURE 2 — AI IMPACT ANALYSIS
 // ═══════════════════════════════════════════════════════
 async function generateImpactAnalysis({
+  ecoId,
+  userId,
   ecoTitle,
   ecoType,
   productName,
@@ -272,17 +312,34 @@ ${auditContext}
 Assess the risk, urgency, and impact of approving this ECO.
 `.trim();
 
+  const start = Date.now();
+  let result;
+
   try {
-    return await callGroq(systemPrompt, userPrompt, 0.3);
+    result = await callGroq(systemPrompt, userPrompt, 0.3);
   } catch {
-    return fallbackImpactAnalysis({ ecoType, changes, openECOsCount });
+    result = fallbackImpactAnalysis({ ecoType, changes, openECOsCount });
   }
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'IMPACT_ANALYSIS',
+    input: { ecoTitle, ecoType, productName, changeCount: changes?.length || 0, openECOsCount },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════
 // FEATURE 3 — CONFLICT DETECTION
 // ═══════════════════════════════════════════════════════
 async function detectECOConflicts({
+  ecoId,
+  userId,
   currentECO,          // { title, type, productId, productName, changes }
   openECOs             // array of other open ECOs for same product
 }) {
@@ -366,15 +423,345 @@ Identify any conflicts, overlaps, or dependencies between the current ECO
 and the existing open ECOs. Be specific about which fields or components conflict.
 `.trim();
 
+  const start = Date.now();
+  let result;
+
   try {
-    return await callGroq(systemPrompt, userPrompt, 0.2);
+    result = await callGroq(systemPrompt, userPrompt, 0.2);
   } catch {
-    return fallbackConflicts(openECOs);
+    result = fallbackConflicts(openECOs);
   }
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'CONFLICT_DETECTION',
+    input: {
+      currentTitle: currentECO?.title,
+      currentType: currentECO?.type,
+      changeCount: currentECO?.changes?.length || 0,
+      openECOsCount: openECOs?.length || 0,
+    },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
+}
+
+// FEATURE 4 — ECO DRAFT QUALITY SCORE
+async function scoreECODraft({
+  ecoId,
+  userId,
+  title,
+  type,
+  productName,
+  changes,
+  description,
+  effectiveDate,
+  versionUpdate,
+}) {
+  const systemPrompt = `
+You are a quality reviewer for Engineering Change Orders in a
+manufacturing PLM system. Your job is to score ECO drafts before
+submission to ensure they meet professional standards.
+
+Score the ECO on these 5 dimensions (0-2 points each, max 10):
+
+1. TITLE_CLARITY (0-2): Is the title specific and descriptive?
+2. CHANGE_COMPLETENESS (0-2): Are changes specific with old and new values?
+3. DESCRIPTION_QUALITY (0-2): Is the business justification clear?
+4. EFFECTIVE_DATE (0-2): Is a realistic effective date provided?
+5. CHANGE_SCOPE (0-2): Are the changes appropriately scoped?
+
+Respond ONLY with valid JSON.
+`.trim();
+
+  const changesText = (changes || []).map((c) =>
+    `  ${c.changeType}: ${c.fieldName} (${c.oldValue || 'N/A'} -> ${c.newValue || 'N/A'})`
+  ).join('\n');
+
+  const userPrompt = `
+Score this ECO draft:
+
+TITLE: "${title || 'Not provided'}"
+TYPE: ${type}
+PRODUCT: ${productName}
+EFFECTIVE DATE: ${effectiveDate || 'Not set'}
+VERSION UPDATE: ${versionUpdate ? 'Creates new version' : 'In-place update'}
+
+PROPOSED CHANGES (${changes?.length || 0} items):
+${changesText || '  No changes proposed yet'}
+
+DESCRIPTION:
+${description || '(No description provided)'}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.2);
+  } catch {
+    result = {
+      total_score: 6,
+      max_score: 10,
+      grade: 'FAIR',
+      blocking: false,
+      improvements: ['Refine description with business impact details'],
+      ready_to_submit: true,
+      summary: 'Fallback quality assessment used due to AI unavailability.',
+    };
+  }
+
+  const latency = Date.now() - start;
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'QUALITY_SCORE',
+    input: { title, type, productName, changesCount: changes?.length || 0 },
+    output: result,
+    latencyMs: latency,
+  });
+
+  if (ecoId) {
+    await prisma.eCO.update({
+      where: { id: ecoId },
+      data: { aiQualityScore: JSON.stringify(result) },
+    });
+  }
+
+  return result;
+}
+
+// FEATURE 5 — CHANGE COMPLEXITY ESTIMATOR
+async function estimateComplexity({
+  ecoId,
+  userId,
+  title,
+  type,
+  productName,
+  currentVersion,
+  changes,
+  versionUpdate,
+  totalECOsOnProduct,
+  avgApprovalDaysHistorical,
+  openECOsOnProduct,
+}) {
+  const systemPrompt = `
+You are a complexity analysis engine for a manufacturing PLM system.
+Estimate how complex and time-consuming the approval process will be.
+Respond ONLY with valid JSON.
+`.trim();
+
+  const changesAnalysis = (changes || []).reduce((acc, c) => {
+    acc[c.changeType] = (acc[c.changeType] || 0) + 1;
+    return acc;
+  }, {});
+
+  const breakdown = Object.entries(changesAnalysis)
+    .map(([t, c]) => `  ${t}: ${c} change(s)`)
+    .join('\n');
+
+  const userPrompt = `
+Estimate approval complexity for this ECO:
+
+ECO: "${title}"
+TYPE: ${type} (${versionUpdate ? 'Creates new version' : 'In-place update'})
+PRODUCT: ${productName} (currently v${currentVersion})
+
+CHANGE BREAKDOWN:
+${breakdown || '  No changes recorded'}
+Total changes: ${changes?.length || 0}
+
+HISTORICAL CONTEXT:
+- Total ECOs ever raised on this product: ${totalECOsOnProduct}
+- Historical average approval time: ${avgApprovalDaysHistorical ? avgApprovalDaysHistorical.toFixed(1) + ' days' : 'No history available'}
+- Other open ECOs on this product right now: ${openECOsOnProduct}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.25);
+  } catch {
+    result = {
+      complexity_level: 'MODERATE',
+      estimated_approval_days: 3,
+      estimated_approval_days_range: '2-4',
+      confidence: 'LOW',
+      complexity_score: 5,
+      complexity_max: 10,
+      factors: [],
+      risks: ['Fallback estimate used due to AI unavailability'],
+      acceleration_tips: ['Add implementation details to speed review'],
+      recommended_approver_type: 'Standard approver',
+      summary: 'Moderate estimated complexity based on fallback rules.',
+    };
+  }
+
+  const latency = Date.now() - start;
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'COMPLEXITY_ESTIMATE',
+    input: { title, type, changesCount: changes?.length || 0, openECOsOnProduct },
+    output: result,
+    latencyMs: latency,
+  });
+
+  if (ecoId) {
+    await prisma.eCO.update({
+      where: { id: ecoId },
+      data: { aiComplexityData: JSON.stringify(result) },
+    });
+  }
+
+  return result;
+}
+
+// FEATURE 6 — SMART ECO TEMPLATING
+async function generateTemplateSuggestion({
+  userId,
+  productId,
+  productName,
+  ecoType,
+  historicalECOs,
+  currentBOMComponents,
+  currentPrices,
+}) {
+  if (!historicalECOs || historicalECOs.length === 0) {
+    return null;
+  }
+
+  const systemPrompt = `
+You are a template suggestion engine for a PLM Engineering Change Order system.
+Analyze historical ECOs and suggest a likely starting template.
+Respond ONLY with valid JSON.
+`.trim();
+
+  const historyText = historicalECOs.slice(0, 5).map((eco) => {
+    const ch = eco.bomComponentChanges || eco.productChanges || [];
+    return `ECO: "${eco.title}" (${eco.type}, ${eco.status})\nChanges: ${ch.map((c) => `${c.changeType} ${c.fieldName || c.field || c.componentName}: ${c.oldValue ?? c.oldQty ?? 'N/A'}->${c.newValue ?? c.newQty ?? 'N/A'}`).join(', ')}`;
+  }).join('\n\n');
+
+  const currentState = ecoType === 'PRODUCT'
+    ? `Sale Price: $${currentPrices?.salePrice}, Cost Price: $${currentPrices?.costPrice}`
+    : `BOM Components: ${(currentBOMComponents || []).map((c) => `${c.componentName} (qty: ${c.quantity})`).join(', ')}`;
+
+  const userPrompt = `
+Generate a template suggestion for a new ${ecoType} ECO on product "${productName}".
+
+RECENT ECO HISTORY FOR THIS PRODUCT:
+${historyText}
+
+CURRENT STATE:
+${currentState}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.3);
+  } catch {
+    result = { has_suggestion: false, reason: 'AI unavailable for template suggestion' };
+  }
+
+  const latency = Date.now() - start;
+
+  await storeAiResult({
+    userId,
+    featureType: 'TEMPLATE_SUGGESTION',
+    input: { productId, productName, ecoType, historicalECOsCount: historicalECOs.length },
+    output: result,
+    latencyMs: latency,
+  });
+
+  return result;
+}
+
+// FEATURE 7 — APPROVAL PRECEDENT FINDER
+async function findApprovalPrecedents({
+  ecoId,
+  userId,
+  title,
+  type,
+  productName,
+  changes,
+  allDoneECOs,
+}) {
+  if (!allDoneECOs || allDoneECOs.length === 0) {
+    return { has_precedents: false, reason: 'No historical ECOs found' };
+  }
+
+  const systemPrompt = `
+You are a precedent matching engine for a PLM approval system.
+Find relevant historical approved ECO precedents.
+Respond ONLY with valid JSON.
+`.trim();
+
+  const currentChangesText = (changes || []).map((c) =>
+    `${c.changeType}: ${c.fieldName || c.field || c.componentName} (${c.oldValue ?? c.oldQty} -> ${c.newValue ?? c.newQty})`
+  ).join(', ');
+
+  const historicalText = allDoneECOs.slice(0, 15).map((eco) => {
+    const ch = eco.bomComponentChanges || eco.productChanges || [];
+    const approval = eco.approvals?.[0];
+    return `Title: "${eco.title}"\nType: ${eco.type} | Product: ${eco.product?.name}\nChanges: ${ch.map((c) => `${c.changeType} ${c.fieldName || c.field || c.componentName}`).join(', ')}\nOutcome: APPROVED\nComment: "${approval?.comment || 'No comment'}"`;
+  }).join('\n---\n');
+
+  const userPrompt = `
+Find precedents for this ECO:
+
+CURRENT ECO: "${title}"
+TYPE: ${type} | PRODUCT: ${productName}
+CHANGES: ${currentChangesText}
+
+HISTORICAL DONE ECOs (${allDoneECOs.length} total, showing top 15):
+${historicalText}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.2);
+  } catch {
+    result = { has_precedents: false, reason: 'AI unavailable for precedent matching' };
+  }
+
+  const latency = Date.now() - start;
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'PRECEDENT_MATCH',
+    input: { title, type, productName, changesCount: changes?.length || 0 },
+    output: result,
+    latencyMs: latency,
+  });
+
+  if (ecoId) {
+    await prisma.eCO.update({
+      where: { id: ecoId },
+      data: { aiPrecedents: JSON.stringify(result) },
+    });
+  }
+
+  return result;
 }
 
 module.exports = {
   generateECODescription,
   generateImpactAnalysis,
-  detectECOConflicts
+  detectECOConflicts,
+  scoreECODraft,
+  estimateComplexity,
+  generateTemplateSuggestion,
+  findApprovalPrecedents,
 };

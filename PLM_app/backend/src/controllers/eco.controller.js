@@ -1,5 +1,6 @@
 const { prisma } = require('../lib/prisma');
 const { mapECO } = require('./_mappers');
+const ai = require('../services/ai.service');
 
 const stageNameToStatus = {
   New: 'NEW',
@@ -244,6 +245,113 @@ const submitForReview = async (req, res) => {
         },
       }),
     ]);
+
+    // Proactive AI triggers on status transition to IN_REVIEW.
+    try {
+      const enriched = await prisma.eCO.findUnique({
+        where: { id },
+        include: {
+          product: { include: { versions: true } },
+          assignedTo: { select: { name: true } },
+          approvals: true,
+          auditLogs: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            include: { user: { select: { name: true } } },
+          },
+        },
+      });
+
+      if (enriched) {
+        const changes = enriched.productChanges || enriched.bomComponentChanges || [];
+
+        const allProductECOs = await prisma.eCO.findMany({
+          where: { productId: enriched.productId },
+          include: { approvals: true },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        const doneECOs = allProductECOs.filter((e) => e.status === 'DONE');
+        const durations = doneECOs
+          .map((e) => {
+            const approval = e.approvals?.[0];
+            if (!approval) return null;
+            return (new Date(approval.createdAt) - new Date(e.createdAt)) / (1000 * 60 * 60 * 24);
+          })
+          .filter((v) => Number.isFinite(v));
+        const avgApprovalDays = durations.length > 0
+          ? durations.reduce((sum, d) => sum + d, 0) / durations.length
+          : null;
+
+        const openECOsCount = allProductECOs.filter(
+          (e) => ['NEW', 'IN_REVIEW', 'APPROVED'].includes(e.status) && e.id !== id
+        ).length;
+
+        const allDoneECOs = await prisma.eCO.findMany({
+          where: { status: 'DONE' },
+          include: {
+            product: { select: { name: true } },
+            approvals: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        });
+
+        if (!enriched.aiAnalysis) {
+          const impact = await ai.generateImpactAnalysis({
+            ecoId: id,
+            userId: req.user.id,
+            ecoTitle: enriched.title,
+            ecoType: enriched.type,
+            productName: enriched.product.name,
+            productStatus: enriched.product.status,
+            currentVersion: enriched.product.currentVersion,
+            changes,
+            versionUpdate: enriched.versionUpdate,
+            effectiveDate: enriched.effectiveDate,
+            recentAuditEvents: enriched.auditLogs,
+            openECOsCount,
+            assignedApprover: enriched.assignedTo?.name || null,
+          });
+
+          await prisma.eCO.update({
+            where: { id },
+            data: { aiAnalysis: JSON.stringify(impact) },
+          });
+        }
+
+        if (!enriched.aiComplexityData) {
+          await ai.estimateComplexity({
+            ecoId: id,
+            userId: req.user.id,
+            title: enriched.title,
+            type: enriched.type,
+            productName: enriched.product.name,
+            currentVersion: enriched.product.currentVersion,
+            changes,
+            versionUpdate: enriched.versionUpdate,
+            totalECOsOnProduct: allProductECOs.length,
+            avgApprovalDaysHistorical: avgApprovalDays,
+            openECOsOnProduct: openECOsCount,
+          });
+        }
+
+        if (!enriched.aiPrecedents) {
+          await ai.findApprovalPrecedents({
+            ecoId: id,
+            userId: req.user.id,
+            title: enriched.title,
+            type: enriched.type,
+            productName: enriched.product.name,
+            changes,
+            allDoneECOs,
+          });
+        }
+      }
+    } catch (aiError) {
+      // AI failures must never block stage transition.
+      console.warn('Reactive AI submit triggers failed:', aiError.message);
+    }
 
     return res.json({ data: { id }, message: 'ECO submitted for review' });
   } catch (error) {

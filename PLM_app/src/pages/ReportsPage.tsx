@@ -15,6 +15,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Download, BarChart3, Archive, Grid2x2 } from 'lucide-react';
 import { reportsService } from '@/services/reports.service';
 import { useProductStore } from '@/stores/useProductStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { cn } from '@/lib/utils';
 import type { ECO, ProductVersion, AuditEntry } from '@/data/mockData';
 
 const actionColors: Record<string, string> = {
@@ -54,8 +56,32 @@ type MatrixRow = {
   operationCount: number;
 };
 
+type AiResultRow = {
+  id: string;
+  featureType: string;
+  output: string;
+  latencyMs?: number | null;
+  cached?: boolean;
+  createdAt: string;
+  eco?: { title: string; status: string } | null;
+  user?: { name: string; role: string } | null;
+};
+
+type AiParsedOutput = {
+  total_score?: number;
+  grade?: string;
+  complexity_level?: string;
+  estimated_approval_days?: number;
+  suggested_changes?: unknown[];
+  confidence?: string;
+  precedents?: Array<{ similarity_score?: number }>;
+  precedent_count?: number;
+  summary?: string;
+};
+
 export default function ReportsPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { products, fetchProducts } = useProductStore();
   const [ecoReport, setEcoReport] = useState<ECO[]>([]);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
@@ -69,6 +95,7 @@ export default function ReportsPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedArchivedProduct, setSelectedArchivedProduct] = useState<ArchivedProduct | null>(null);
   const [expandedMatrix, setExpandedMatrix] = useState<string | null>(null);
+  const [aiResults, setAiResults] = useState<AiResultRow[]>([]);
 
   useEffect(() => {
     fetchProducts();
@@ -76,7 +103,10 @@ export default function ReportsPage() {
     reportsService.getAuditLog().then(setAuditLog);
     reportsService.getArchivedProducts().then(setArchivedProducts);
     reportsService.getActiveMatrix().then(setActiveMatrix);
-  }, [fetchProducts]);
+    if (user?.role === 'ADMIN') {
+      reportsService.getAiResults().then(setAiResults).catch(() => setAiResults([]));
+    }
+  }, [fetchProducts, user?.role]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -115,6 +145,69 @@ export default function ReportsPage() {
     return { componentChanges, operationChanges };
   };
 
+  const featureBadge = (featureType: string) => {
+    const map: Record<string, { label: string; cls: string }> = {
+      QUALITY_SCORE: { label: 'Quality Score', cls: 'bg-blue-900/40 text-blue-300 border-blue-500/30' },
+      COMPLEXITY_ESTIMATE: { label: 'Complexity', cls: 'bg-amber-900/40 text-amber-300 border-amber-500/30' },
+      TEMPLATE_SUGGESTION: { label: 'Template', cls: 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-500/30' },
+      PRECEDENT_MATCH: { label: 'Precedent', cls: 'bg-green-900/40 text-green-300 border-green-500/30' },
+      IMPACT_ANALYSIS: { label: 'Impact', cls: 'bg-red-900/40 text-red-300 border-red-500/30' },
+      CONFLICT_DETECTION: { label: 'Conflict', cls: 'bg-orange-900/40 text-orange-300 border-orange-500/30' },
+      DESCRIPTION: { label: 'Description', cls: 'bg-slate-900/40 text-slate-300 border-slate-500/30' },
+    };
+    return map[featureType] || { label: featureType, cls: 'bg-muted text-muted-foreground border-border' };
+  };
+
+  const summarizeAiOutput = (row: AiResultRow) => {
+    let parsed: AiParsedOutput | null = null;
+    try {
+      parsed = JSON.parse(row.output || '{}') as AiParsedOutput;
+    } catch {
+      parsed = null;
+    }
+
+    if (!parsed) return 'No summary';
+
+    if (row.featureType === 'QUALITY_SCORE') {
+      return `Score: ${parsed.total_score ?? '-'} / 10 - ${parsed.grade || 'N/A'}`;
+    }
+    if (row.featureType === 'COMPLEXITY_ESTIMATE') {
+      return `${parsed.complexity_level || 'N/A'} - ~${parsed.estimated_approval_days || '?'} days`;
+    }
+    if (row.featureType === 'TEMPLATE_SUGGESTION') {
+      return `${parsed.suggested_changes?.length || 0} changes suggested (${parsed.confidence || 'N/A'} confidence)`;
+    }
+    if (row.featureType === 'PRECEDENT_MATCH') {
+      const top = parsed.precedents?.[0]?.similarity_score;
+      return `${parsed.precedent_count || parsed.precedents?.length || 0} precedents found${top ? ` (${top}% match)` : ''}`;
+    }
+    if (parsed.summary) return String(parsed.summary);
+    return 'AI output captured';
+  };
+
+  const aiStats = useMemo(() => {
+    if (!aiResults.length) {
+      return { total: 0, avgLatency: 0, cacheHitRate: 0, mostUsedFeature: 'N/A' };
+    }
+
+    const total = aiResults.length;
+    const avgLatency = Math.round(
+      aiResults.reduce((sum, r) => sum + (Number(r.latencyMs) || 0), 0) / total
+    );
+    const cacheHitRate = Math.round(
+      (aiResults.filter((r) => r.cached).length / total) * 100
+    );
+
+    const countByFeature = aiResults.reduce((acc: Record<string, number>, row) => {
+      acc[row.featureType] = (acc[row.featureType] || 0) + 1;
+      return acc;
+    }, {});
+    const mostUsedFeature = Object.entries(countByFeature)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+    return { total, avgLatency, cacheHitRate, mostUsedFeature };
+  }, [aiResults]);
+
   return (
     <div className="animate-fade-in text-foreground pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -131,14 +224,72 @@ export default function ReportsPage() {
       </div>
 
       <Tabs defaultValue="matrix" className="w-full">
-        <TabsList className="w-full h-auto bg-muted/50 border border-border shadow-sm rounded-xl p-2 grid grid-cols-2 md:grid-cols-6 mb-8 font-medium">
+        <TabsList className={cn(
+          'w-full h-auto bg-muted/50 border border-border shadow-sm rounded-xl p-2 mb-8 font-medium',
+          user?.role === 'ADMIN' ? 'grid grid-cols-2 md:grid-cols-7' : 'grid grid-cols-2 md:grid-cols-6'
+        )}>
           <TabsTrigger value="matrix" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">Product Matrix</TabsTrigger>
           <TabsTrigger value="eco" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">ECO Analytics</TabsTrigger>
           <TabsTrigger value="product" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">Versions</TabsTrigger>
           <TabsTrigger value="bom" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">BOM History</TabsTrigger>
           <TabsTrigger value="audit" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">Audit Log</TabsTrigger>
           <TabsTrigger value="archived" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">Vault</TabsTrigger>
+          {user?.role === 'ADMIN' && (
+            <TabsTrigger value="ai-observatory" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg py-3 transition-all">AI Observatory</TabsTrigger>
+          )}
         </TabsList>
+
+        {user?.role === 'ADMIN' && (
+          <TabsContent value="ai-observatory" className="animate-slide-up space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total AI Calls</p><p className="text-2xl font-semibold">{aiStats.total}</p></CardContent></Card>
+              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Latency</p><p className="text-2xl font-semibold">{aiStats.avgLatency} ms</p></CardContent></Card>
+              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cache Hit Rate</p><p className="text-2xl font-semibold">{aiStats.cacheHitRate}%</p></CardContent></Card>
+              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Most Used Feature</p><p className="text-lg font-semibold">{featureBadge(aiStats.mostUsedFeature).label}</p></CardContent></Card>
+            </div>
+
+            <Card className="bg-card border-border overflow-hidden">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead>Feature</TableHead>
+                      <TableHead>ECO</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Score / Summary</TableHead>
+                      <TableHead>Latency</TableHead>
+                      <TableHead>Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {aiResults.map((row) => {
+                      const badge = featureBadge(row.featureType);
+                      const latency = Number(row.latencyMs) || 0;
+                      const latencyClass = latency < 1000 ? 'text-green-400' : latency <= 3000 ? 'text-amber-400' : 'text-red-400';
+                      return (
+                        <TableRow key={row.id} className="border-border">
+                          <TableCell><Badge variant="outline" className={badge.cls}>{badge.label}</Badge></TableCell>
+                          <TableCell>{row.eco?.title || 'System event'}</TableCell>
+                          <TableCell>{row.user?.name || 'System'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{summarizeAiOutput(row)}</TableCell>
+                          <TableCell className={latencyClass}>{latency ? `${latency} ms` : '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString()}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {aiResults.length === 0 && (
+                      <TableRow className="border-border">
+                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                          No AI activity recorded yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="eco" className="animate-slide-up">
           <Card className="bg-card border-border shadow-sm rounded-xl overflow-hidden">

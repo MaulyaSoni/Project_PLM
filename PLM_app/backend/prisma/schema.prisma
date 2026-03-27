@@ -53,6 +53,7 @@ model User {
   assignedEco ECO[]         @relation("AssignedECOs")
   approvals   ECOApproval[]
   auditLogs   AuditLog[]
+  aiResults   AiResult[]
 }
 
 model Product {
@@ -142,6 +143,10 @@ model ECO {
   aiAnalysis          String?         @map("ai_analysis") // cached JSON from impact analysis
   aiSummary           String?         @map("ai_summary")  // cached one-line summary
   aiTags              String?         @map("ai_tags")     // cached JSON array of tags
+  aiQualityScore      String?         @map("ai_quality_score")
+  aiComplexityData    String?         @map("ai_complexity_data")
+  aiTemplateSuggestion String?        @map("ai_template_suggestion")
+  aiPrecedents        String?         @map("ai_precedents")
   createdAt           DateTime        @default(now())
 
   product            Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -151,6 +156,25 @@ model ECO {
   stage              ECOStage        @relation(fields: [stageId], references: [id], onDelete: Restrict)
   approvals          ECOApproval[]
   auditLogs          AuditLog[]
+  aiResults          AiResult[]
+}
+
+model AiResult {
+  id          String   @id @default(uuid())
+  ecoId       String?  @map("eco_id")
+  userId      String?  @map("user_id")
+  featureType String   @map("feature_type")
+  input       String
+  output      String
+  modelUsed   String   @default("llama-3.1-70b-versatile") @map("model_used")
+  latencyMs   Int?     @map("latency_ms")
+  cached      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  eco         ECO?     @relation(fields: [ecoId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("ai_results")
 }
 
 model ECOApproval {

@@ -120,6 +120,10 @@ export interface ECO {
   productChanges?: ECOProductChange[];
   bomComponentChanges?: ECOBOMComponentChange[];
   aiAnalysis?: string;
+  aiQualityScore?: string;
+  aiComplexityData?: string;
+  aiTemplateSuggestion?: string;
+  aiPrecedents?: string;
   aiSummary?: string;
   aiTags?: string[];
   description?: string;
