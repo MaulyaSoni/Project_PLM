@@ -82,6 +82,8 @@ const mapECO = (eco) => {
     aiComplexityData: eco.aiComplexityData || undefined,
     aiTemplateSuggestion: eco.aiTemplateSuggestion || undefined,
     aiPrecedents: eco.aiPrecedents || undefined,
+    aiApprovalPrediction: eco.aiApprovalPrediction || undefined,
+    aiBomImpactGraph: eco.aiBomImpactGraph || undefined,
     aiSummary: eco.aiSummary || undefined,
     aiTags: eco.aiTags ? JSON.parse(eco.aiTags) : undefined,
     description: eco.description || undefined,

@@ -124,6 +124,8 @@ export interface ECO {
   aiComplexityData?: string;
   aiTemplateSuggestion?: string;
   aiPrecedents?: string;
+  aiApprovalPrediction?: string;
+  aiBomImpactGraph?: string;
   aiSummary?: string;
   aiTags?: string[];
   description?: string;

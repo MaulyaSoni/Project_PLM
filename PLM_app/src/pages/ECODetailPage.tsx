@@ -59,10 +59,54 @@ type PrecedentsData = {
   reason?: string;
 };
 
+type ApprovalPredictionData = {
+  approval_probability?: number;
+  predicted_outcome?: 'APPROVE' | 'REJECT';
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+  top_risk_factors?: string[];
+  recommended_fixes?: string[];
+  rationale?: string;
+};
+
+type BomImpactGraphData = {
+  affected_components?: Array<{
+    component?: string;
+    impact_type?: string;
+    severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  }>;
+  likely_bottlenecks?: string[];
+  rollback_risk?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  qa_risk?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+};
+
+type SimilarECOPanelData = {
+  top_similar_ecos?: Array<{
+    eco_id?: string;
+    eco_title?: string;
+    match_confidence?: number;
+    outcome?: string;
+    timeline_days?: number;
+    applied_fixes?: string[];
+  }>;
+};
+
+type RolloutSimulationPanelData = {
+  rollout_strategy?: string;
+  predicted_stability?: string;
+  estimated_days_to_full_rollout?: number;
+  phases?: Array<{
+    phase?: string;
+    timeline?: string;
+    objective?: string;
+  }>;
+  likely_blockers?: string[];
+  rollback_plan?: string;
+};
+
 export default function ECODetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentECO, isLoading, fetchECOById, updateECOStage } = useECOStore();
+  const { currentECO, isLoading, fetchECOById, refreshECOById, updateECOStage } = useECOStore();
   const { fetchProducts } = useProductStore();
   const { fetchBOMs } = useBOMStore();
   const { user } = useAuthStore();
@@ -77,7 +121,17 @@ export default function ECODetailPage() {
   const [loadingComplexity, setLoadingComplexity] = useState(false);
   const [precedents, setPrecedents] = useState<PrecedentsData | null>(null);
   const [loadingPrecedents, setLoadingPrecedents] = useState(false);
+  const [approvalPrediction, setApprovalPrediction] = useState<ApprovalPredictionData | null>(null);
+  const [loadingApprovalPrediction, setLoadingApprovalPrediction] = useState(false);
+  const [bomImpactGraph, setBomImpactGraph] = useState<BomImpactGraphData | null>(null);
+  const [loadingBomImpactGraph, setLoadingBomImpactGraph] = useState(false);
+  const [similarECOs, setSimilarECOs] = useState<SimilarECOPanelData | null>(null);
+  const [loadingSimilarECOs, setLoadingSimilarECOs] = useState(false);
+  const [rolloutSimulation, setRolloutSimulation] = useState<RolloutSimulationPanelData | null>(null);
+  const [loadingRolloutSimulation, setLoadingRolloutSimulation] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState<'submit' | 'approve' | 'reject' | 'apply' | null>(null);
+  const [actionMessage, setActionMessage] = useState('');
   const [checklist, setChecklist] = useState({
     reviewed_all_changes: false,
     verified_technical_feasibility: false,
@@ -125,7 +179,7 @@ export default function ECODetailPage() {
     if (currentECO?.status && currentECO.status !== 'NEW') {
       loadComplexity();
     }
-  }, [currentECO?.id, currentECO?.status, currentECO?.aiComplexityData]);
+  }, [currentECO?.id, currentECO?.status, currentECO?.aiComplexityData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (currentECO?.aiPrecedents) {
@@ -139,7 +193,48 @@ export default function ECODetailPage() {
     if (currentECO?.status === 'IN_REVIEW' && (user?.role === 'APPROVER' || user?.role === 'ADMIN')) {
       loadPrecedents();
     }
-  }, [currentECO?.id, currentECO?.status, currentECO?.aiPrecedents, user?.role]);
+  }, [currentECO?.id, currentECO?.status, currentECO?.aiPrecedents, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (currentECO?.aiApprovalPrediction) {
+      try {
+        setApprovalPrediction(JSON.parse(currentECO.aiApprovalPrediction));
+      } catch {
+        setApprovalPrediction(null);
+      }
+      return;
+    }
+
+    if (currentECO?.id && currentECO.status !== 'DONE') {
+      loadApprovalPrediction();
+    }
+  }, [currentECO?.id, currentECO?.status, currentECO?.aiApprovalPrediction]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (currentECO?.type !== 'BOM') {
+      setBomImpactGraph(null);
+      return;
+    }
+
+    if (currentECO?.aiBomImpactGraph) {
+      try {
+        setBomImpactGraph(JSON.parse(currentECO.aiBomImpactGraph));
+      } catch {
+        setBomImpactGraph(null);
+      }
+      return;
+    }
+
+    if (currentECO?.id) {
+      loadBomImpactGraph();
+    }
+  }, [currentECO?.id, currentECO?.type, currentECO?.aiBomImpactGraph]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!currentECO?.id) return;
+    loadSimilarECOs();
+    loadRolloutSimulation();
+  }, [currentECO?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const generateImpact = async () => {
     if (!id) return;
@@ -183,6 +278,58 @@ export default function ECODetailPage() {
     }
   };
 
+  const loadApprovalPrediction = async () => {
+    if (!id) return;
+    setLoadingApprovalPrediction(true);
+    try {
+      const response = await api.get(`/ai/approval-outcome/${id}`);
+      setApprovalPrediction(response.data.data);
+    } catch (e) {
+      console.error('Approval predictor load failed:', e);
+    } finally {
+      setLoadingApprovalPrediction(false);
+    }
+  };
+
+  const loadBomImpactGraph = async () => {
+    if (!id || currentECO?.type !== 'BOM') return;
+    setLoadingBomImpactGraph(true);
+    try {
+      const response = await api.get(`/ai/bom-impact/${id}`);
+      setBomImpactGraph(response.data.data);
+    } catch (e) {
+      console.error('BOM impact graph load failed:', e);
+    } finally {
+      setLoadingBomImpactGraph(false);
+    }
+  };
+
+  const loadSimilarECOs = async () => {
+    if (!id) return;
+    setLoadingSimilarECOs(true);
+    try {
+      const response = await api.get(`/ai/similar-ecos/${id}`);
+      setSimilarECOs(response.data.data);
+    } catch (e) {
+      console.error('Similar ECOs load failed:', e);
+    } finally {
+      setLoadingSimilarECOs(false);
+    }
+  };
+
+  const loadRolloutSimulation = async () => {
+    if (!id) return;
+    setLoadingRolloutSimulation(true);
+    try {
+      const response = await api.get(`/ai/rollout-simulator/${id}`);
+      setRolloutSimulation(response.data.data);
+    } catch (e) {
+      console.error('Rollout simulation load failed:', e);
+    } finally {
+      setLoadingRolloutSimulation(false);
+    }
+  };
+
   const COMPLEXITY_COLORS: Record<string, { text: string; border: string; bg: string }> = {
     SIMPLE: { text: 'text-green-400', border: 'border-green-500/30', bg: 'bg-green-950/20' },
     MODERATE: { text: 'text-blue-400', border: 'border-blue-500/30', bg: 'bg-blue-950/20' },
@@ -193,13 +340,15 @@ export default function ECODetailPage() {
   const handleApprove = async () => {
     if (!allChecked || !id) return;
     setApproving(true);
+    setActionInProgress('approve');
+    setActionMessage('Finalizing approval and refreshing ECO...');
     try {
       await api.patch(`/ecos/${id}/approve`, {
         comment,
         checklistItems: checkedItems,
       });
       toast.success('ECO approved with 5/5 compliance checks recorded.');
-      await fetchECOById(id);
+      await refreshECOById(id);
       setComment('');
       setChecklist({
         reviewed_all_changes: false,
@@ -213,6 +362,8 @@ export default function ECODetailPage() {
       toast.error(apiErr.response?.data?.error || 'Approval failed');
     } finally {
       setApproving(false);
+      setActionInProgress(null);
+      setActionMessage('');
     }
   };
 
@@ -242,13 +393,29 @@ export default function ECODetailPage() {
   const stageIndex = Math.max(0, stagesList.indexOf(eco.stage));
 
   const handleAction = async (action: 'submit' | 'approve' | 'reject' | 'apply') => {
-    await updateECOStage(eco.id, action, comment, user?.id, user?.name);
-    if (action === 'apply') {
-      await Promise.all([fetchProducts(), fetchBOMs()]);
+    setActionInProgress(action);
+    const actionText = {
+      submit: 'Submitting ECO for review...',
+      approve: 'Approving ECO...',
+      reject: 'Rejecting ECO and rolling back stage...',
+      apply: 'Applying ECO and creating new version...',
+    };
+    setActionMessage(actionText[action]);
+    try {
+      await updateECOStage(eco.id, action, comment, user?.id, user?.name);
+      if (action === 'apply') {
+        await Promise.all([fetchProducts(), fetchBOMs()]);
+      }
+      setComment('');
+      const msgs = { submit: 'Submitted for review', approve: 'ECO approved', reject: 'ECO rejected', apply: 'ECO applied successfully' };
+      toast.success(msgs[action]);
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(apiErr.response?.data?.error || apiErr.message || 'Action failed');
+    } finally {
+      setActionInProgress(null);
+      setActionMessage('');
     }
-    setComment('');
-    const msgs = { submit: 'Submitted for review', approve: 'ECO approved', reject: 'ECO rejected', apply: 'ECO applied successfully' };
-    toast.success(msgs[action]);
   };
 
   return (
@@ -708,13 +875,158 @@ export default function ECODetailPage() {
             </Card>
           )}
 
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Approval Outcome Predictor
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingApprovalPrediction ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Predicting approval outcome...
+                </div>
+              ) : approvalPrediction ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Approval Probability</span>
+                    <Badge variant="outline" className={cn(
+                      (approvalPrediction.approval_probability || 0) >= 70 && 'bg-success/10 text-success border-success/30',
+                      (approvalPrediction.approval_probability || 0) >= 55 && (approvalPrediction.approval_probability || 0) < 70 && 'bg-warning/10 text-warning border-warning/30',
+                      (approvalPrediction.approval_probability || 0) < 55 && 'bg-destructive/10 text-destructive border-destructive/30'
+                    )}>
+                      {approvalPrediction.approval_probability || 0}% · {approvalPrediction.predicted_outcome}
+                    </Badge>
+                  </div>
+                  {(approvalPrediction.top_risk_factors || []).slice(0, 3).map((risk, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">Risk: {risk}</p>
+                  ))}
+                  {(approvalPrediction.recommended_fixes || []).slice(0, 3).map((fix, i) => (
+                    <p key={i} className="text-xs text-primary">Fix: {fix}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No prediction available yet for this ECO.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {eco.type === 'BOM' && (
+            <Card className="border-blue-500/30 bg-blue-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-blue-300" />
+                  Intelligent BOM Change Impact Graph
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingBomImpactGraph ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Building BOM impact graph...
+                  </div>
+                ) : bomImpactGraph ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-300">Affected components: {(bomImpactGraph.affected_components || []).length}</p>
+                    {(bomImpactGraph.affected_components || []).slice(0, 3).map((item, i) => (
+                      <p key={i} className="text-xs text-slate-400">{item.component} · {item.impact_type} · {item.severity}</p>
+                    ))}
+                    {(bomImpactGraph.likely_bottlenecks || []).slice(0, 2).map((b, i) => (
+                      <p key={i} className="text-xs text-amber-300">Bottleneck: {b}</p>
+                    ))}
+                    <p className="text-xs text-red-300">Rollback risk: {bomImpactGraph.rollback_risk || 'N/A'}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No BOM impact analysis available yet.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="border-indigo-500/30 bg-indigo-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-indigo-300" />
+                Similar ECO Search + Reuse
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingSimilarECOs ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Searching similar ECOs...
+                </div>
+              ) : similarECOs?.top_similar_ecos?.length ? (
+                <div className="space-y-2">
+                  {similarECOs.top_similar_ecos.slice(0, 3).map((item, idx) => (
+                    <div key={item.eco_id || idx} className="rounded border border-slate-700/60 bg-slate-900/40 p-2 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-200 truncate">{item.eco_title}</p>
+                        <Badge variant="outline" className="text-[10px] border-indigo-300/30 text-indigo-300">{item.match_confidence}%</Badge>
+                      </div>
+                      <p className="text-[11px] text-slate-400">Outcome: {item.outcome} · Timeline: {item.timeline_days} day(s)</p>
+                      {(item.applied_fixes || []).slice(0, 1).map((fix, i) => (
+                        <p key={i} className="text-[11px] text-emerald-300">Fix: {fix}</p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">No similar historical ECOs found for this product yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-cyan-500/30 bg-cyan-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4 text-cyan-300" />
+                Production Rollout Simulator
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingRolloutSimulation ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Simulating rollout...
+                </div>
+              ) : rolloutSimulation ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-300">Strategy: {rolloutSimulation.rollout_strategy} · Stability: {rolloutSimulation.predicted_stability}</p>
+                  <p className="text-xs text-slate-400">ETA full rollout: {rolloutSimulation.estimated_days_to_full_rollout} day(s)</p>
+                  {(rolloutSimulation.phases || []).slice(0, 2).map((phase, idx) => (
+                    <p key={idx} className="text-xs text-slate-300">{phase.phase}: {phase.timeline} · {phase.objective}</p>
+                  ))}
+                  {(rolloutSimulation.likely_blockers || []).slice(0, 1).map((b, idx) => (
+                    <p key={idx} className="text-xs text-amber-300">Blocker: {b}</p>
+                  ))}
+                  {rolloutSimulation.rollback_plan && <p className="text-xs text-red-300">Rollback: {rolloutSimulation.rollback_plan}</p>}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Rollout simulation is not available yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Stage Actions */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-3"><CardTitle className="text-base">Actions</CardTitle></CardHeader>
             <CardContent className="space-y-3">
+              {actionInProgress && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-2 animate-fade-in">
+                  <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                  <div>
+                    <p className="text-sm font-medium text-primary">Processing action...</p>
+                    <p className="text-xs text-muted-foreground">{actionMessage}</p>
+                  </div>
+                </div>
+              )}
               {canSubmit && (
-                <Button onClick={() => handleAction('submit')} className="w-full">
-                  <Send className="h-4 w-4 mr-2" />Submit for Review
+                <Button onClick={() => handleAction('submit')} className="w-full" disabled={!!actionInProgress}>
+                  {actionInProgress === 'submit' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                  {actionInProgress === 'submit' ? 'Submitting...' : 'Submit for Review'}
                 </Button>
               )}
               {canApprove && (
@@ -811,10 +1123,11 @@ export default function ECODetailPage() {
                     <Button
                       variant="outline"
                       onClick={handleReject}
-                      disabled={approving}
+                      disabled={approving || !!actionInProgress}
                       className="border-destructive/40 text-destructive hover:bg-destructive/10"
                     >
-                      <XCircle className="h-4 w-4 mr-1" />Reject
+                      {actionInProgress === 'reject' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
+                      {actionInProgress === 'reject' ? 'Rejecting...' : 'Reject'}
                     </Button>
                   </div>
                 </div>
@@ -822,8 +1135,9 @@ export default function ECODetailPage() {
               {canApply && (
                 <>
                   <p className="text-xs text-warning">Applying will create a new version and archive the current one.</p>
-                  <Button onClick={() => setApplyConfirm(true)} className="w-full">
-                    <Play className="h-4 w-4 mr-2" />Apply ECO & Close
+                  <Button onClick={() => setApplyConfirm(true)} className="w-full" disabled={!!actionInProgress}>
+                    {actionInProgress === 'apply' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+                    {actionInProgress === 'apply' ? 'Applying...' : 'Apply ECO & Close'}
                   </Button>
                 </>
               )}

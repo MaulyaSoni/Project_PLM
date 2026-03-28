@@ -147,6 +147,8 @@ model ECO {
   aiComplexityData    String?         @map("ai_complexity_data")
   aiTemplateSuggestion String?        @map("ai_template_suggestion")
   aiPrecedents        String?         @map("ai_precedents")
+  aiApprovalPrediction String?        @map("ai_approval_prediction")
+  aiBomImpactGraph     String?        @map("ai_bom_impact_graph")
   createdAt           DateTime        @default(now())
 
   product            Product         @relation(fields: [productId], references: [id], onDelete: Cascade)

@@ -142,6 +142,206 @@ function fallbackConflicts(openECOs) {
   };
 }
 
+function fallbackApprovalOutcomePrediction({ ecoType, changes, openECOsCount, recentRejectionsOnProduct }) {
+  const count = Array.isArray(changes) ? changes.length : 0;
+  const pressure = Math.min(30, (openECOsCount || 0) * 5 + (recentRejectionsOnProduct || 0) * 8);
+  const complexityPenalty = Math.min(35, count * (ecoType === 'BOM' ? 4 : 3));
+  const approvalProbability = Math.max(25, Math.min(95, 88 - pressure - complexityPenalty));
+  const predictedOutcome = approvalProbability >= 55 ? 'APPROVE' : 'REJECT';
+
+  return {
+    approval_probability: approvalProbability,
+    predicted_outcome: predictedOutcome,
+    confidence: approvalProbability >= 75 || approvalProbability <= 40 ? 'HIGH' : 'MEDIUM',
+    top_risk_factors: [
+      count > 6 ? 'Large change-set increases review burden and error risk' : 'Change-set size is manageable but still needs complete validation',
+      openECOsCount > 0 ? 'Concurrent ECOs on this product may create reviewer hesitation' : 'No concurrent ECO pressure detected',
+      recentRejectionsOnProduct > 0 ? 'Recent rejection history on this product raises scrutiny' : 'No recent rejection pattern detected',
+    ],
+    recommended_fixes: [
+      'Add explicit implementation and rollback steps in the ECO description',
+      'Attach validation evidence (test/QA checks) before submit',
+      'Clarify effective date and operations readiness to reduce reviewer uncertainty',
+    ],
+    rationale: 'Fallback heuristic model used due to AI unavailability.',
+  };
+}
+
+function fallbackBOMImpactGraph({ changes, openECOsCount }) {
+  const normalizedChanges = Array.isArray(changes) ? changes : [];
+  const changed = normalizedChanges.filter((c) => String(c.changeType || '').toUpperCase() !== 'UNCHANGED');
+
+  const affectedComponents = changed.slice(0, 8).map((c) => {
+    const name = c.fieldName || c.componentName || 'Unknown component';
+    const ct = String(c.changeType || '').toUpperCase();
+    const severity = ct === 'REMOVED' ? 'HIGH' : ct === 'ADDED' ? 'MEDIUM' : 'MEDIUM';
+    return {
+      component: name,
+      impact_type: ct || 'CHANGED',
+      severity,
+      downstream_effects: [
+        'Potential routing or assembly update required',
+        'Supplier and inventory alignment required before release',
+      ],
+    };
+  });
+
+  const nodes = affectedComponents.map((c, idx) => ({
+    id: `cmp-${idx + 1}`,
+    label: c.component,
+    type: 'COMPONENT',
+    criticality: c.severity,
+  }));
+
+  const edges = nodes.slice(1).map((node, idx) => ({
+    from: nodes[idx].id,
+    to: node.id,
+    relation: 'DEPENDS_ON',
+    weight: 0.6,
+  }));
+
+  return {
+    summary: `Fallback graph generated for ${affectedComponents.length} affected component(s).`,
+    affected_components: affectedComponents,
+    likely_bottlenecks: [
+      'Component availability and supplier confirmation',
+      'QA requalification for modified assembly sequence',
+      openECOsCount > 0 ? 'Reviewer capacity due to concurrent ECOs' : 'No significant review queue pressure',
+    ],
+    cost_impact: {
+      direction: affectedComponents.length >= 4 ? 'INCREASE' : 'NEUTRAL',
+      estimated_percent: affectedComponents.length >= 4 ? 4 : 1,
+    },
+    lead_time_impact: {
+      direction: affectedComponents.length >= 3 ? 'INCREASE' : 'NEUTRAL',
+      estimated_days: affectedComponents.length >= 3 ? 3 : 1,
+    },
+    qa_risk: affectedComponents.some((c) => c.severity === 'HIGH') ? 'HIGH' : 'MEDIUM',
+    rollback_risk: affectedComponents.length > 5 ? 'HIGH' : 'MEDIUM',
+    dependency_graph: {
+      nodes,
+      edges,
+    },
+  };
+}
+
+function tokenizeText(input) {
+  return String(input || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+}
+
+function jaccardSimilarity(a, b) {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size === 0 || setB.size === 0) return 0;
+
+  let intersection = 0;
+  for (const item of setA) {
+    if (setB.has(item)) intersection += 1;
+  }
+
+  const union = new Set([...setA, ...setB]).size;
+  return union > 0 ? intersection / union : 0;
+}
+
+function fallbackSimilarECOs({ currentECO, candidateECOs }) {
+  const currentTokens = tokenizeText(`${currentECO.title} ${currentECO.type} ${currentECO.description || ''}`);
+
+  const scored = (candidateECOs || []).map((eco) => {
+    const candidateTokens = tokenizeText(`${eco.title} ${eco.type} ${eco.description || ''}`);
+    const textScore = jaccardSimilarity(currentTokens, candidateTokens);
+
+    const currentChangeFields = new Set((currentECO.changes || []).map((c) => String(c.fieldName || c.componentName || '').toLowerCase()));
+    const ecoChangeFields = new Set((eco.changes || []).map((c) => String(c.fieldName || c.componentName || '').toLowerCase()));
+    const overlap = [...currentChangeFields].filter((f) => ecoChangeFields.has(f)).length;
+    const maxFieldCount = Math.max(1, currentChangeFields.size, ecoChangeFields.size);
+    const changeScore = overlap / maxFieldCount;
+
+    const typeBonus = currentECO.type === eco.type ? 0.15 : 0;
+    const productBonus = currentECO.productId && eco.productId && currentECO.productId === eco.productId ? 0.15 : 0;
+
+    const confidence = Math.round(Math.min(99, Math.max(10, (textScore * 45 + changeScore * 35 + typeBonus * 100 + productBonus * 100))));
+
+    return {
+      eco_id: eco.id,
+      eco_title: eco.title,
+      match_confidence: confidence,
+      outcome: eco.outcome || 'APPROVED',
+      timeline_days: eco.timelineDays || 0,
+      applied_fixes: eco.appliedFixes || ['Reuse prior implementation checklist and QA signoff pattern'],
+      reusable_template: {
+        suggested_title: `${currentECO.type} update based on ${eco.title}`,
+        suggested_description: eco.description || 'Align change scope and validation evidence with historical successful ECO.',
+        suggested_changes: (eco.changes || []).slice(0, 4),
+      },
+    };
+  })
+    .sort((a, b) => b.match_confidence - a.match_confidence)
+    .slice(0, 5);
+
+  const top = scored[0] || null;
+
+  return {
+    top_similar_ecos: scored,
+    reusable_template: top?.reusable_template || {
+      suggested_title: currentECO.title,
+      suggested_description: currentECO.description || '',
+      suggested_changes: currentECO.changes || [],
+    },
+  };
+}
+
+function fallbackWritingCopilot({ title, description, ecoType, productName }) {
+  const normalizedTitle = String(title || '').trim();
+  const baseDescription = String(description || '').trim();
+
+  return {
+    improved_title: normalizedTitle ? `Controlled ${ecoType} change: ${normalizedTitle}` : `${ecoType} update for ${productName}`,
+    concise_summary: `This ECO proposes a controlled ${ecoType.toLowerCase()} update for ${productName}, with clear implementation and verification steps before release.`,
+    technical_detail_version: baseDescription || `Engineering scope includes targeted ${ecoType.toLowerCase()} deltas, validation evidence, and rollback readiness to protect production continuity.`,
+    approver_version: `Approval requested for a scoped ${ecoType.toLowerCase()} change on ${productName}. Impact and controls are documented to support safe execution.`,
+  };
+}
+
+function fallbackRolloutSimulation({ ecoType, changes, effectiveDate }) {
+  const count = Array.isArray(changes) ? changes.length : 0;
+  const isLarge = count >= 6;
+
+  return {
+    rollout_strategy: isLarge ? 'PHASED' : 'CONTROLLED_BIG_BANG',
+    predicted_stability: isLarge ? 'MEDIUM' : 'HIGH',
+    estimated_days_to_full_rollout: isLarge ? 7 : 3,
+    phases: [
+      {
+        phase: 'Pilot Lot',
+        timeline: 'Day 1',
+        objective: `Validate ${ecoType.toLowerCase()} change on limited volume and monitor defects.`,
+        go_no_go_checks: ['QA pass rate >= 98%', 'No critical safety/compliance issues'],
+      },
+      {
+        phase: 'Partial Ramp',
+        timeline: 'Day 2-4',
+        objective: 'Scale to selected work centers and suppliers with heightened monitoring.',
+        go_no_go_checks: ['Lead time variance <= 5%', 'Material availability confirmed'],
+      },
+      {
+        phase: 'Full Rollout',
+        timeline: isLarge ? 'Day 5-7' : 'Day 3',
+        objective: `Complete rollout aligned to effective date ${effectiveDate || '(TBD)'}.`,
+        go_no_go_checks: ['Operations signoff', 'Approver post-implementation acknowledgment'],
+      },
+    ],
+    likely_blockers: [
+      'Supplier confirmation delays',
+      'QA capacity constraints during ramp-up',
+    ],
+    rollback_plan: 'Revert to previous BOM/Product version and pause rollout if critical defect trend exceeds threshold in pilot.',
+  };
+}
+
 function normalizeQualityScore(result) {
   const fallback = {
     total_score: 6,
@@ -837,6 +1037,320 @@ ${historicalText}
   return result;
 }
 
+// FEATURE 8 — APPROVAL OUTCOME PREDICTOR
+async function predictApprovalOutcome({
+  ecoId,
+  userId,
+  ecoTitle,
+  ecoType,
+  productName,
+  description,
+  changes,
+  versionUpdate,
+  effectiveDate,
+  openECOsCount,
+  recentRejectionsOnProduct,
+  assignedApprover,
+}) {
+  const systemPrompt = `
+You are an approval risk prediction engine for a manufacturing PLM system.
+Predict whether an ECO is likely to be approved or rejected and explain why.
+
+Respond ONLY with valid JSON in this exact shape:
+{
+  "approval_probability": 68,
+  "predicted_outcome": "APPROVE | REJECT",
+  "confidence": "LOW | MEDIUM | HIGH",
+  "top_risk_factors": ["risk 1", "risk 2", "risk 3"],
+  "recommended_fixes": ["fix 1", "fix 2", "fix 3"],
+  "rationale": "One short paragraph"
+}
+
+Rules:
+- approval_probability is an integer 0-100.
+- If approval_probability < 55, predicted_outcome must be REJECT.
+- Risk factors and fixes must be specific and actionable for engineering users.
+`.trim();
+
+  const changesText = (changes || []).map((c) => {
+    const field = c.fieldName || c.componentName || c.field || 'field';
+    const oldValue = c.oldValue ?? c.oldQty ?? 'N/A';
+    const newValue = c.newValue ?? c.newQty ?? 'N/A';
+    return `- ${String(c.changeType || 'CHANGED').toUpperCase()}: ${field} (${oldValue} -> ${newValue})`;
+  }).join('\n');
+
+  const userPrompt = `
+Evaluate likely approval outcome for this ECO draft:
+
+TITLE: ${ecoTitle}
+TYPE: ${ecoType}
+PRODUCT: ${productName}
+VERSION STRATEGY: ${versionUpdate ? 'New version release' : 'In-place update'}
+EFFECTIVE DATE: ${effectiveDate || 'Not set'}
+ASSIGNED APPROVER: ${assignedApprover || 'Unassigned'}
+OTHER OPEN ECOS ON PRODUCT: ${openECOsCount}
+RECENT REJECTIONS ON PRODUCT (last 90d): ${recentRejectionsOnProduct}
+
+DESCRIPTION:
+${description || '(No description provided)'}
+
+PROPOSED CHANGES:
+${changesText || '- No changes listed'}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.2);
+  } catch {
+    result = fallbackApprovalOutcomePrediction({ ecoType, changes, openECOsCount, recentRejectionsOnProduct });
+  }
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'APPROVAL_OUTCOME_PREDICTOR',
+    input: {
+      ecoTitle,
+      ecoType,
+      productName,
+      changesCount: changes?.length || 0,
+      openECOsCount,
+      recentRejectionsOnProduct,
+    },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
+}
+
+// FEATURE 9 — INTELLIGENT BOM CHANGE IMPACT GRAPH
+async function generateBOMImpactGraph({
+  ecoId,
+  userId,
+  ecoTitle,
+  productName,
+  changes,
+  bomComponents,
+  openECOsCount,
+}) {
+  const systemPrompt = `
+You are a BOM impact intelligence engine for a manufacturing PLM system.
+Analyze proposed BOM changes and produce a dependency-aware impact graph.
+
+Respond ONLY with valid JSON in this exact shape:
+{
+  "summary": "one paragraph",
+  "affected_components": [
+    {
+      "component": "name",
+      "impact_type": "ADDED | REMOVED | CHANGED",
+      "severity": "LOW | MEDIUM | HIGH | CRITICAL",
+      "downstream_effects": ["effect 1", "effect 2"]
+    }
+  ],
+  "likely_bottlenecks": ["bottleneck 1", "bottleneck 2"],
+  "cost_impact": {
+    "direction": "DECREASE | NEUTRAL | INCREASE",
+    "estimated_percent": 4
+  },
+  "lead_time_impact": {
+    "direction": "DECREASE | NEUTRAL | INCREASE",
+    "estimated_days": 3
+  },
+  "qa_risk": "LOW | MEDIUM | HIGH | CRITICAL",
+  "rollback_risk": "LOW | MEDIUM | HIGH | CRITICAL",
+  "dependency_graph": {
+    "nodes": [
+      {"id": "n1", "label": "component", "type": "COMPONENT | OPERATION | SUPPLIER", "criticality": "LOW | MEDIUM | HIGH | CRITICAL"}
+    ],
+    "edges": [
+      {"from": "n1", "to": "n2", "relation": "DEPENDS_ON | IMPACTS", "weight": 0.6}
+    ]
+  }
+}
+`.trim();
+
+  const changesText = (changes || []).map((c) => {
+    const field = c.fieldName || c.componentName || c.field || 'field';
+    const oldValue = c.oldValue ?? c.oldQty ?? 'N/A';
+    const newValue = c.newValue ?? c.newQty ?? 'N/A';
+    return `- ${String(c.changeType || 'CHANGED').toUpperCase()}: ${field} (${oldValue} -> ${newValue})`;
+  }).join('\n');
+
+  const bomContext = (bomComponents || [])
+    .slice(0, 30)
+    .map((c) => `- ${c.componentName || c.name}: qty ${c.quantity ?? c.newQty ?? c.oldQty ?? 'N/A'}`)
+    .join('\n');
+
+  const userPrompt = `
+Build BOM impact graph for this ECO:
+
+ECO TITLE: ${ecoTitle}
+PRODUCT: ${productName}
+OTHER OPEN ECOS ON PRODUCT: ${openECOsCount}
+
+PROPOSED BOM CHANGES:
+${changesText || '- No BOM changes listed'}
+
+CURRENT BOM CONTEXT:
+${bomContext || '- Not available'}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.25);
+  } catch {
+    result = fallbackBOMImpactGraph({ changes, openECOsCount });
+  }
+
+  await storeAiResult({
+    ecoId,
+    userId,
+    featureType: 'BOM_IMPACT_GRAPH',
+    input: {
+      ecoTitle,
+      productName,
+      changesCount: changes?.length || 0,
+      openECOsCount,
+    },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
+}
+
+// FEATURE 10 — ECO SIMILARITY SEARCH + REUSE
+async function searchSimilarECOs({
+  ecoId,
+  userId,
+  currentECO,
+  candidateECOs,
+}) {
+  const start = Date.now();
+  const result = fallbackSimilarECOs({ currentECO, candidateECOs });
+
+  await storeAiResult({
+    ecoId: ecoId || null,
+    userId,
+    featureType: 'SIMILAR_ECO_SEARCH',
+    input: {
+      currentTitle: currentECO?.title,
+      currentType: currentECO?.type,
+      candidateCount: candidateECOs?.length || 0,
+    },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
+}
+
+// FEATURE 11 — AI CO-PILOT FOR ECO WRITING
+async function rewriteECOCopy({
+  ecoId,
+  userId,
+  title,
+  description,
+  ecoType,
+  productName,
+  changes,
+}) {
+  const systemPrompt = `
+You are an ECO writing copilot for a manufacturing PLM system.
+Rewrite ECO copy into high-clarity, audit-ready language.
+
+Respond ONLY with valid JSON in this exact shape:
+{
+  "improved_title": "...",
+  "concise_summary": "...",
+  "technical_detail_version": "...",
+  "approver_version": "..."
+}
+
+Rules:
+- concise_summary must be <= 220 characters.
+- technical_detail_version should be precise and implementation-oriented.
+- approver_version should focus on risk, controls, and approval readiness.
+`.trim();
+
+  const changesText = (changes || []).map((c) => {
+    const field = c.fieldName || c.componentName || c.field || 'field';
+    const oldValue = c.oldValue ?? c.oldQty ?? 'N/A';
+    const newValue = c.newValue ?? c.newQty ?? 'N/A';
+    return `- ${String(c.changeType || 'CHANGED').toUpperCase()}: ${field} (${oldValue} -> ${newValue})`;
+  }).join('\n');
+
+  const userPrompt = `
+TITLE:
+${title || '(empty)'}
+
+DESCRIPTION:
+${description || '(empty)'}
+
+TYPE: ${ecoType}
+PRODUCT: ${productName}
+
+CHANGES:
+${changesText || '- none'}
+`.trim();
+
+  const start = Date.now();
+  let result;
+
+  try {
+    result = await callGroq(systemPrompt, userPrompt, 0.35);
+  } catch {
+    result = fallbackWritingCopilot({ title, description, ecoType, productName });
+  }
+
+  await storeAiResult({
+    ecoId: ecoId || null,
+    userId,
+    featureType: 'ECO_WRITING_COPILOT',
+    input: { title, ecoType, productName, changesCount: changes?.length || 0 },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
+}
+
+// FEATURE 12 — PRODUCTION ROLLOUT SIMULATOR (MVP)
+async function simulateProductionRollout({
+  ecoId,
+  userId,
+  ecoTitle,
+  ecoType,
+  productName,
+  changes,
+  effectiveDate,
+}) {
+  const start = Date.now();
+  const result = fallbackRolloutSimulation({ ecoType, changes, effectiveDate });
+
+  await storeAiResult({
+    ecoId: ecoId || null,
+    userId,
+    featureType: 'PRODUCTION_ROLLOUT_SIM',
+    input: { ecoTitle, ecoType, productName, changesCount: changes?.length || 0 },
+    output: result,
+    latencyMs: Date.now() - start,
+    cached: false,
+  });
+
+  return result;
+}
+
 module.exports = {
   generateECODescription,
   generateImpactAnalysis,
@@ -845,4 +1359,9 @@ module.exports = {
   estimateComplexity,
   generateTemplateSuggestion,
   findApprovalPrecedents,
+  predictApprovalOutcome,
+  generateBOMImpactGraph,
+  searchSimilarECOs,
+  rewriteECOCopy,
+  simulateProductionRollout,
 };

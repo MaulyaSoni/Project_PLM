@@ -66,6 +66,71 @@ type QualityScore = {
   improvements?: string[];
 };
 
+type ApprovalPrediction = {
+  approval_probability?: number;
+  predicted_outcome?: 'APPROVE' | 'REJECT';
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+  top_risk_factors?: string[];
+  recommended_fixes?: string[];
+  rationale?: string;
+};
+
+type BomImpactGraph = {
+  affected_components?: Array<{
+    component?: string;
+    impact_type?: string;
+    severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  }>;
+  likely_bottlenecks?: string[];
+  rollback_risk?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  qa_risk?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+};
+
+type SimilarECOResult = {
+  eco_id?: string;
+  eco_title?: string;
+  match_confidence?: number;
+  outcome?: string;
+  timeline_days?: number;
+  applied_fixes?: string[];
+  reusable_template?: {
+    suggested_title?: string;
+    suggested_description?: string;
+    suggested_changes?: Array<{
+      fieldName?: string;
+      componentName?: string;
+      oldValue?: string | number | null;
+      newValue?: string | number | null;
+      changeType?: string;
+    }>;
+  };
+};
+
+type SimilarECOData = {
+  top_similar_ecos?: SimilarECOResult[];
+  reusable_template?: SimilarECOResult['reusable_template'];
+};
+
+type WritingCopilotData = {
+  improved_title?: string;
+  concise_summary?: string;
+  technical_detail_version?: string;
+  approver_version?: string;
+};
+
+type RolloutSimulationData = {
+  rollout_strategy?: string;
+  predicted_stability?: string;
+  estimated_days_to_full_rollout?: number;
+  phases?: Array<{
+    phase?: string;
+    timeline?: string;
+    objective?: string;
+  }>;
+  likely_blockers?: string[];
+  rollback_plan?: string;
+};
+
 export default function CreateECODialog({ open, onOpenChange, initialType, initialProductId, initialBOMId, initialTitle, eco: editEco }: Props) {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
@@ -89,6 +154,15 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const [qualityScore, setQualityScore] = useState<QualityScore | null>(null);
   const [animatedQualityScore, setAnimatedQualityScore] = useState(0);
   const [scoringDraft, setScoringDraft] = useState(false);
+  const [approvalPrediction, setApprovalPrediction] = useState<ApprovalPrediction | null>(null);
+  const [bomImpactGraph, setBomImpactGraph] = useState<BomImpactGraph | null>(null);
+  const [runningPreSubmitGate, setRunningPreSubmitGate] = useState(false);
+  const [similarECOs, setSimilarECOs] = useState<SimilarECOData | null>(null);
+  const [loadingSimilarECOs, setLoadingSimilarECOs] = useState(false);
+  const [writingCopilot, setWritingCopilot] = useState<WritingCopilotData | null>(null);
+  const [runningWritingCopilot, setRunningWritingCopilot] = useState(false);
+  const [rolloutSimulation, setRolloutSimulation] = useState<RolloutSimulationData | null>(null);
+  const [runningRolloutSim, setRunningRolloutSim] = useState(false);
 
   // Product changes
   const [newSalePrice, setNewSalePrice] = useState('');
@@ -139,6 +213,20 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
       if (editEco.description) setDescription(editEco.description);
       if (editEco.aiSummary) setAiSummary(editEco.aiSummary);
       if (editEco.aiTags) setAiTags(editEco.aiTags);
+      if (editEco.aiApprovalPrediction) {
+        try {
+          setApprovalPrediction(JSON.parse(editEco.aiApprovalPrediction));
+        } catch {
+          setApprovalPrediction(null);
+        }
+      }
+      if (editEco.aiBomImpactGraph) {
+        try {
+          setBomImpactGraph(JSON.parse(editEco.aiBomImpactGraph));
+        } catch {
+          setBomImpactGraph(null);
+        }
+      }
       return;
     }
 
@@ -159,7 +247,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   useEffect(() => {
     if (!open || !productId || !type) return;
     fetchTemplateSuggestion();
-  }, [open, productId, type]);
+  }, [open, productId, type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!qualityScore?.total_score) {
@@ -196,6 +284,15 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     setLoadingTemplate(false);
     setQualityScore(null);
     setScoringDraft(false);
+    setApprovalPrediction(null);
+    setBomImpactGraph(null);
+    setRunningPreSubmitGate(false);
+    setSimilarECOs(null);
+    setLoadingSimilarECOs(false);
+    setWritingCopilot(null);
+    setRunningWritingCopilot(false);
+    setRolloutSimulation(null);
+    setRunningRolloutSim(false);
     setIsSubmitting(false);
   };
 
@@ -385,9 +482,172 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     }
   };
 
+  const runPreSubmitGate = async () => {
+    if (!title || !type || !productId) {
+      toast.error('Complete title, type and product before running pre-submit checks.');
+      return;
+    }
+
+    setRunningPreSubmitGate(true);
+    try {
+      const changes = getDraftChanges();
+
+      const approvalRes = await api.post('/ai/approval-outcome-predictor', {
+        ecoId: editEco?.id || null,
+        ecoTitle: title,
+        ecoType: type,
+        productId,
+        changes,
+        effectiveDate: effectiveDate || null,
+        versionUpdate,
+        description,
+      });
+
+      const approval = approvalRes.data?.data;
+      setApprovalPrediction(approval);
+
+      if (type === 'BOM') {
+        const impactRes = await api.post('/ai/bom-impact-graph', {
+          ecoId: editEco?.id || null,
+          ecoTitle: title,
+          productId,
+          bomId: bomId || null,
+          changes,
+        });
+        setBomImpactGraph(impactRes.data?.data || null);
+      } else {
+        setBomImpactGraph(null);
+      }
+
+      if ((approval?.approval_probability || 0) < 55 || approval?.predicted_outcome === 'REJECT') {
+        toast.warning('Pre-submit gate found elevated rejection risk. Apply recommended fixes first.');
+      } else {
+        toast.success('Pre-submit gate passed. This ECO looks ready for approver review.');
+      }
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(apiErr.response?.data?.error || apiErr.message || 'Pre-submit gate failed');
+    } finally {
+      setRunningPreSubmitGate(false);
+    }
+  };
+
+  const runSimilaritySearch = async () => {
+    if (!title || !type || !productId) {
+      toast.error('Provide title, type and product before similarity search.');
+      return;
+    }
+
+    setLoadingSimilarECOs(true);
+    try {
+      const response = await api.post('/ai/similar-ecos', {
+        ecoId: editEco?.id || null,
+        ecoTitle: title,
+        ecoType: type,
+        productId,
+        description,
+        changes: getDraftChanges(),
+      });
+
+      setSimilarECOs(response.data?.data || null);
+      toast.success('Similar ECO search completed.');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(apiErr.response?.data?.error || apiErr.message || 'Similarity search failed');
+    } finally {
+      setLoadingSimilarECOs(false);
+    }
+  };
+
+  const applyReusableTemplate = (template?: SimilarECOResult['reusable_template']) => {
+    if (!template) return;
+
+    if (template.suggested_title && !title) setTitle(template.suggested_title);
+    if (template.suggested_description) setDescription(template.suggested_description);
+
+    if (type === 'BOM' && Array.isArray(template.suggested_changes) && template.suggested_changes.length > 0) {
+      const suggested = template.suggested_changes.map((c) => ({
+        name: c.componentName || c.fieldName || '',
+        oldQty: c.oldValue != null ? String(c.oldValue) : '0',
+        newQty: c.newValue != null ? String(c.newValue) : '',
+        changeType: c.changeType || 'CHANGED',
+      }));
+      setBomChanges(suggested);
+    }
+
+    toast.success('Reusable template applied. Review before submit.');
+  };
+
+  const runWritingCopilot = async () => {
+    if (!type || !productId) {
+      toast.error('Select ECO type and product before using Writing Co-Pilot.');
+      return;
+    }
+
+    setRunningWritingCopilot(true);
+    try {
+      const response = await api.post('/ai/eco-writing-copilot', {
+        ecoId: editEco?.id || null,
+        title,
+        description,
+        ecoType: type,
+        productId,
+        changes: getDraftChanges(),
+      });
+      setWritingCopilot(response.data?.data || null);
+      toast.success('Writing Co-Pilot suggestions ready.');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(apiErr.response?.data?.error || apiErr.message || 'Writing Co-Pilot failed');
+    } finally {
+      setRunningWritingCopilot(false);
+    }
+  };
+
+  const runRolloutSimulation = async () => {
+    if (!title || !type || !productId) {
+      toast.error('Provide title, type and product before rollout simulation.');
+      return;
+    }
+
+    setRunningRolloutSim(true);
+    try {
+      const response = await api.post('/ai/rollout-simulator', {
+        ecoId: editEco?.id || null,
+        ecoTitle: title,
+        ecoType: type,
+        productId,
+        effectiveDate: effectiveDate || null,
+        changes: getDraftChanges(),
+      });
+      setRolloutSimulation(response.data?.data || null);
+      toast.success('Production rollout simulation generated.');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(apiErr.response?.data?.error || apiErr.message || 'Rollout simulation failed');
+    } finally {
+      setRunningRolloutSim(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user || !type) return;
     if (isSubmitting) return;
+
+    if (!approvalPrediction) {
+      toast.error('Run the pre-submit gate before submitting this ECO.');
+      return;
+    }
+
+    if ((approvalPrediction.approval_probability || 0) < 55 || approvalPrediction.predicted_outcome === 'REJECT') {
+      toast.error('Predicted rejection risk is high. Address recommended fixes before submit.');
+      return;
+    }
+
+    if (type === 'BOM' && !bomImpactGraph) {
+      toast.error('Run BOM impact graph analysis before submitting BOM ECOs.');
+      return;
+    }
 
     if (effectiveDate) {
       const selected = new Date(effectiveDate);
@@ -422,6 +682,8 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
         await updateECO(editEco.id, {
           title, effectiveDate, versionUpdate, productChanges, bomComponentChanges,
           description, aiSummary, aiTags,
+          aiApprovalPrediction: approvalPrediction ? JSON.stringify(approvalPrediction) : null,
+          aiBomImpactGraph: bomImpactGraph ? JSON.stringify(bomImpactGraph) : null,
         });
         toast.success('ECO updated');
         onOpenChange(false);
@@ -433,6 +695,8 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
           effectiveDate, versionUpdate, createdBy: user.id, createdByName: user.name,
           productChanges, bomComponentChanges,
           description, aiSummary, aiTags,
+          aiApprovalPrediction: approvalPrediction ? JSON.stringify(approvalPrediction) : null,
+          aiBomImpactGraph: bomImpactGraph ? JSON.stringify(bomImpactGraph) : null,
         });
         toast.success('ECO created');
         onOpenChange(false);
@@ -477,7 +741,18 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>ECO Title</Label>
-              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Describe the change..." className="bg-muted border-border" />
+              <div className="flex items-center gap-2">
+                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Describe the change..." className="bg-muted border-border" />
+                <Button variant="outline" size="sm" onClick={runWritingCopilot} disabled={runningWritingCopilot || !type || !productId}>
+                  {runningWritingCopilot ? '...' : 'Co-Pilot'}
+                </Button>
+              </div>
+              {writingCopilot?.improved_title && (
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-2 flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">Suggested title: <span className="text-foreground">{writingCopilot.improved_title}</span></p>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setTitle(writingCopilot.improved_title || title)}>Use</Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -504,6 +779,38 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 <SelectContent>{products.filter(p => p.status === 'ACTIVE').map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+
+            <Card className="border-indigo-500/30 bg-indigo-950/20">
+              <CardContent className="p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">ECO Similarity Search + Reuse</p>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={runSimilaritySearch} disabled={loadingSimilarECOs || !title || !type || !productId}>
+                    {loadingSimilarECOs ? 'Searching...' : 'Find Similar'}
+                  </Button>
+                </div>
+                {similarECOs?.top_similar_ecos?.length ? (
+                  <div className="space-y-2">
+                    {similarECOs.top_similar_ecos.slice(0, 3).map((item, idx) => (
+                      <div key={item.eco_id || idx} className="rounded border border-slate-700/50 bg-slate-900/40 p-2 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-slate-200 truncate">{item.eco_title}</p>
+                          <Badge variant="outline" className="text-[10px] border-indigo-300/30 text-indigo-300">{item.match_confidence}%</Badge>
+                        </div>
+                        <p className="text-[11px] text-slate-400">Outcome: {item.outcome} · Timeline: {item.timeline_days} day(s)</p>
+                        {(item.applied_fixes || []).slice(0, 1).map((fix, i) => (
+                          <p key={i} className="text-[11px] text-emerald-300">Fix: {fix}</p>
+                        ))}
+                        <Button size="sm" variant="ghost" className="h-6 text-[11px] px-2" onClick={() => applyReusableTemplate(item.reusable_template)}>
+                          Apply Reusable Template
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">Search similar completed ECOs to reuse proven outcomes and fixes.</p>
+                )}
+              </CardContent>
+            </Card>
 
             {loadingTemplate && (
               <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-3 overflow-hidden animate-fade-in">
@@ -638,6 +945,29 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 <Button variant="outline" size="sm" onClick={() => setBomChanges([...bomChanges, { name: '', oldQty: '0', newQty: '', changeType: 'ADDED' }])}>
                   <Plus className="h-3 w-3 mr-1" />Add Component
                 </Button>
+
+                <Card className="border-blue-500/30 bg-blue-950/15">
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-300">Intelligent BOM Change Impact</p>
+                      {bomImpactGraph?.rollback_risk && (
+                        <Badge variant="outline" className="text-[10px] border-blue-300/30 text-blue-300">
+                          Rollback {bomImpactGraph.rollback_risk}
+                        </Badge>
+                      )}
+                    </div>
+                    {bomImpactGraph ? (
+                      <>
+                        <p className="text-xs text-slate-300">Affected components: {(bomImpactGraph.affected_components || []).length}</p>
+                        {(bomImpactGraph.likely_bottlenecks || []).slice(0, 2).map((item, i) => (
+                          <p key={i} className="text-xs text-slate-400">- {item}</p>
+                        ))}
+                      </>
+                    ) : (
+                      <p className="text-xs text-slate-400">Run Pre-Submit Gate in the next step to generate the impact graph card.</p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
 
@@ -709,6 +1039,47 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 </div>
               </div>
             )}
+
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">AI Co-Pilot for ECO Writing</p>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={runWritingCopilot} disabled={runningWritingCopilot || !type || !productId}>
+                    {runningWritingCopilot ? 'Writing...' : 'Rewrite'}
+                  </Button>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Draft Description (Step 2)</Label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Draft your technical/audit-ready description here..."
+                    className="bg-muted border-border min-h-[90px] text-sm"
+                  />
+                </div>
+
+                {writingCopilot && (
+                  <div className="rounded-md border border-border bg-card p-2 space-y-2">
+                    {writingCopilot.concise_summary && <p className="text-xs text-slate-300">Summary: {writingCopilot.concise_summary}</p>}
+                    {writingCopilot.technical_detail_version && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] uppercase tracking-wider text-slate-500">Technical Detail Version</p>
+                        <p className="text-xs text-slate-300">{writingCopilot.technical_detail_version}</p>
+                        <Button size="sm" variant="ghost" className="h-6 text-[11px] px-2" onClick={() => setDescription(writingCopilot.technical_detail_version || description)}>Use Technical</Button>
+                      </div>
+                    )}
+                    {writingCopilot.approver_version && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] uppercase tracking-wider text-slate-500">Approver Version</p>
+                        <p className="text-xs text-slate-300">{writingCopilot.approver_version}</p>
+                        <Button size="sm" variant="ghost" className="h-6 text-[11px] px-2" onClick={() => setDescription(writingCopilot.approver_version || description)}>Use Approver</Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
@@ -822,6 +1193,83 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                 </div>
               )}
             </div>
+
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">Pre-Submit Approval Gate</p>
+                    <p className="text-xs text-muted-foreground">Runs approval outcome predictor and, for BOM ECOs, impact graph analysis.</p>
+                  </div>
+                  <Button size="sm" onClick={runPreSubmitGate} disabled={runningPreSubmitGate || !title || !productId || !type}>
+                    {runningPreSubmitGate ? 'Running...' : 'Run Gate'}
+                  </Button>
+                </div>
+
+                {approvalPrediction ? (
+                  <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase tracking-wider text-muted-foreground">Approval Probability</span>
+                      <Badge variant="outline" className={cn(
+                        (approvalPrediction.approval_probability || 0) >= 70 && 'bg-success/10 text-success border-success/30',
+                        (approvalPrediction.approval_probability || 0) >= 55 && (approvalPrediction.approval_probability || 0) < 70 && 'bg-warning/10 text-warning border-warning/30',
+                        (approvalPrediction.approval_probability || 0) < 55 && 'bg-destructive/10 text-destructive border-destructive/30'
+                      )}>
+                        {approvalPrediction.approval_probability || 0}% · {approvalPrediction.predicted_outcome}
+                      </Badge>
+                    </div>
+                    {(approvalPrediction.top_risk_factors || []).slice(0, 3).map((risk, i) => (
+                      <p key={i} className="text-xs text-muted-foreground">Risk: {risk}</p>
+                    ))}
+                    {(approvalPrediction.recommended_fixes || []).slice(0, 3).map((fix, i) => (
+                      <p key={i} className="text-xs text-primary">Fix: {fix}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Run the gate to unlock submit readiness.</p>
+                )}
+
+                {type === 'BOM' && bomImpactGraph && (
+                  <div className="rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 space-y-2">
+                    <p className="text-xs uppercase tracking-wider text-blue-300">BOM Impact Analysis Card</p>
+                    <p className="text-xs text-slate-300">Affected components: {(bomImpactGraph.affected_components || []).length}</p>
+                    {(bomImpactGraph.affected_components || []).slice(0, 3).map((item, i) => (
+                      <p key={i} className="text-xs text-slate-400">{item.component} · {item.impact_type} · {item.severity}</p>
+                    ))}
+                    {(bomImpactGraph.likely_bottlenecks || []).slice(0, 2).map((item, i) => (
+                      <p key={i} className="text-xs text-amber-300">Bottleneck: {item}</p>
+                    ))}
+                    <p className="text-xs text-red-300">Rollback risk: {bomImpactGraph.rollback_risk || 'N/A'}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-cyan-500/30 bg-cyan-950/20">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-cyan-300">Production Rollout Simulator (MVP)</p>
+                  <Button size="sm" variant="outline" onClick={runRolloutSimulation} disabled={runningRolloutSim || !title || !type || !productId}>
+                    {runningRolloutSim ? 'Simulating...' : 'Simulate'}
+                  </Button>
+                </div>
+                {rolloutSimulation ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-300">Strategy: {rolloutSimulation.rollout_strategy} · Stability: {rolloutSimulation.predicted_stability}</p>
+                    <p className="text-xs text-slate-400">ETA full rollout: {rolloutSimulation.estimated_days_to_full_rollout} day(s)</p>
+                    {(rolloutSimulation.phases || []).slice(0, 3).map((phase, idx) => (
+                      <p key={idx} className="text-xs text-slate-300">{phase.phase}: {phase.timeline} · {phase.objective}</p>
+                    ))}
+                    {(rolloutSimulation.likely_blockers || []).slice(0, 2).map((item, idx) => (
+                      <p key={idx} className="text-xs text-amber-300">Blocker: {item}</p>
+                    ))}
+                    {rolloutSimulation.rollback_plan && <p className="text-xs text-red-300">Rollback: {rolloutSimulation.rollback_plan}</p>}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">Generate phased rollout and rollback risk simulation before final submit.</p>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="flex items-center gap-2">
               <Checkbox id="confirm" checked={confirmed} onCheckedChange={v => setConfirmed(!!v)} />

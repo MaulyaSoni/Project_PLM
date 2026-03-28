@@ -8,6 +8,7 @@ interface ECOState {
   isLoading: boolean;
   fetchECOs: () => Promise<void>;
   fetchECOById: (id: string) => Promise<void>;
+  refreshECOById: (id: string) => Promise<void>;
   createECO: (data: Partial<ECO>) => Promise<ECO>;
   updateECO: (id: string, data: Partial<ECO>) => Promise<ECO>;
   deleteECO: (id: string) => Promise<void>;
@@ -38,6 +39,15 @@ export const useECOStore = create<ECOState>((set) => ({
     } catch (error) {
       console.error('Failed to fetch ECO details:', error);
       set({ isLoading: false });
+    }
+  },
+
+  refreshECOById: async (id) => {
+    try {
+      const eco = await ecoService.getById(id);
+      set({ currentECO: eco || null });
+    } catch (error) {
+      console.error('Failed to refresh ECO details:', error);
     }
   },
 

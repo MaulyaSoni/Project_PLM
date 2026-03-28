@@ -9,7 +9,7 @@ const { PORT } = require('./src/config/env');
 const { startAgentScheduler } = require('./src/services/agentScheduler.service');
 
 const server = app.listen(PORT, () => {
-  console.log(`PLM backend running on port ${PORT}`);
+  console.log(`PLM Backend started successfully on port ${PORT}.`);
   startAgentScheduler();
 });
 

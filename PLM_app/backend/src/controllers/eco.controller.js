@@ -41,8 +41,8 @@ const includeShape = {
   user: true,
   assignedTo: true,
   stage: true,
-  approvals: { include: { user: true }, orderBy: { createdAt: 'desc' } },
-  auditLogs: { include: { user: true }, orderBy: { createdAt: 'desc' } },
+  approvals: { include: { user: true }, orderBy: { createdAt: 'desc' }, take: 25 },
+  auditLogs: { include: { user: true }, orderBy: { createdAt: 'desc' }, take: 80 },
 };
 
 const getAllECOs = async (_req, res) => {
@@ -88,6 +88,8 @@ const createECO = async (req, res) => {
       description,
       aiSummary,
       aiTags,
+      aiApprovalPrediction,
+      aiBomImpactGraph,
     } = req.body;
 
     const normalizedTitle = String(title || '').trim();
@@ -180,6 +182,8 @@ const createECO = async (req, res) => {
         description: description || null,
         aiSummary: aiSummary || null,
         aiTags: Array.isArray(aiTags) ? JSON.stringify(aiTags) : (aiTags || null),
+        aiApprovalPrediction: aiApprovalPrediction || null,
+        aiBomImpactGraph: aiBomImpactGraph || null,
         auditLogs: {
           create: isAdmin ? [
             {
@@ -345,6 +349,59 @@ const submitForReview = async (req, res) => {
             productName: enriched.product.name,
             changes,
             allDoneECOs,
+          });
+        }
+
+        if (!enriched.aiApprovalPrediction) {
+          const recentRejectionsOnProduct = await prisma.eCOApproval.count({
+            where: {
+              approved: false,
+              eco: { productId: enriched.productId },
+              createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+            },
+          });
+
+          const approvalPrediction = await ai.predictApprovalOutcome({
+            ecoId: id,
+            userId: req.user.id,
+            ecoTitle: enriched.title,
+            ecoType: enriched.type,
+            productName: enriched.product.name,
+            description: enriched.description || '',
+            changes,
+            versionUpdate: enriched.versionUpdate,
+            effectiveDate: enriched.effectiveDate,
+            openECOsCount,
+            recentRejectionsOnProduct,
+            assignedApprover: enriched.assignedTo?.name || null,
+          });
+
+          await prisma.eCO.update({
+            where: { id },
+            data: { aiApprovalPrediction: JSON.stringify(approvalPrediction) },
+          });
+        }
+
+        if (!enriched.aiBomImpactGraph && enriched.type === 'BOM') {
+          const latestBOM = await prisma.bOM.findFirst({
+            where: { productId: enriched.productId, status: 'ACTIVE' },
+            include: { components: true },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          const impactGraph = await ai.generateBOMImpactGraph({
+            ecoId: id,
+            userId: req.user.id,
+            ecoTitle: enriched.title,
+            productName: enriched.product.name,
+            changes,
+            bomComponents: latestBOM?.components || [],
+            openECOsCount,
+          });
+
+          await prisma.eCO.update({
+            where: { id },
+            data: { aiBomImpactGraph: JSON.stringify(impactGraph) },
           });
         }
       }
@@ -662,7 +719,7 @@ const updateECO = async (req, res) => {
     const {
       title, effectiveDate, versionUpdate,
       productChanges, bomComponentChanges,
-      description, aiAnalysis, aiSummary, aiTags
+      description, aiAnalysis, aiSummary, aiTags, aiApprovalPrediction, aiBomImpactGraph
     } = req.body;
 
     const eco = await prisma.eCO.findUnique({ where: { id } });
@@ -687,6 +744,8 @@ const updateECO = async (req, res) => {
         aiAnalysis: aiAnalysis ?? eco.aiAnalysis,
         aiSummary: aiSummary ?? eco.aiSummary,
         aiTags: aiTags ? (Array.isArray(aiTags) ? JSON.stringify(aiTags) : aiTags) : eco.aiTags,
+        aiApprovalPrediction: aiApprovalPrediction ?? eco.aiApprovalPrediction,
+        aiBomImpactGraph: aiBomImpactGraph ?? eco.aiBomImpactGraph,
       },
       include: includeShape,
     });
