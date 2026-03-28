@@ -6,9 +6,11 @@ dotenv.config({ path: path.resolve(__dirname, '.env'), override: true });
 
 const app = require('./src/app');
 const { PORT } = require('./src/config/env');
+const { startAgentScheduler } = require('./src/services/agentScheduler.service');
 
 const server = app.listen(PORT, () => {
   console.log(`PLM backend running on port ${PORT}`);
+  startAgentScheduler();
 });
 
 server.on('error', (error) => {

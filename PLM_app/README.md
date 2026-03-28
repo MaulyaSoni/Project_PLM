@@ -8,6 +8,7 @@ A modern, full-stack Product Lifecycle Management (PLM) application for managing
 - **Bill of Materials (BOM):** Manage complex product assemblies, components, and manufacturing operations.
 - **Engineering Change Orders (ECO):** Propose workflow-based changes to Products or BOMs. Supports stages (New, In Review, Approved, Done) and strict approval processes.
 - **AI-Powered Insights:** Automatically summarizes the impact of ECOs and categorizes changes using the Groq API.
+- **Agentic Lifecycle Monitoring:** A background scheduler detects ECO bottlenecks in `IN_REVIEW`, records `AgentAction` events, and surfaces nudges in the Admin AI Observatory.
 - **Role-Based Access Control (RBAC):** Distinct roles (Admin, Engineering, Approver, Operations) for secure access mapping.
 - **Audit Logging:** Maintain a history of actions, version changes, and approximations for compliance.
 
@@ -81,6 +82,35 @@ d:\ODOO_PROJECT\PLM_app
    npm run prisma:migrate
    npm run prisma:seed
    ```
+
+### Prisma Migration Baseline (Drift Cleanup)
+
+If your local database was previously managed with `prisma db push`, this repository now includes a baseline migration at `backend/prisma/migrations/20260328120000_baseline`.
+
+For an existing DB with current schema already applied, run:
+
+```bash
+cd backend
+npm run prisma:migrate:baseline
+```
+
+For fresh environments/CI, run:
+
+```bash
+cd backend
+npm run prisma:migrate:deploy
+npm run prisma:seed
+```
+
+### Lifecycle Agent (Stage 3 Foundation)
+
+The backend now starts a cron-based lifecycle agent on boot (`node-cron`) to monitor ECOs stuck in review and create contextual nudges.
+
+- Scheduler env vars are defined in `backend/.env.example`.
+- Agent persistence is stored in Prisma model `AgentAction`.
+- Admin endpoints:
+   - `GET /api/reports/agent-alerts`
+   - `POST /api/reports/agent/run`
 5. Start the backend development server:
    ```bash
    npm run dev

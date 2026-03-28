@@ -8,6 +8,8 @@ const {
   getActiveMatrix,
   getAuditLog,
   getUsers,
+  getLifecycleAgentAlerts,
+  runLifecycleAgentNow,
 } = require('../controllers/reports.controller');
 const { authenticate } = require('../middleware/auth');
 const { authorize, ROLES } = require('../middleware/roles');
@@ -22,5 +24,7 @@ router.get('/archived-products', authenticate, authorize([ROLES.ADMIN]), getArch
 router.get('/active-matrix', authenticate, authorize([ROLES.ADMIN]), getActiveMatrix);
 router.get('/audit-log', authenticate, authorize([ROLES.ADMIN]), getAuditLog);
 router.get('/users', authenticate, authorize([ROLES.ADMIN]), getUsers);
+router.get('/agent-alerts', authenticate, authorize([ROLES.ADMIN]), getLifecycleAgentAlerts);
+router.post('/agent/run', authenticate, authorize([ROLES.ADMIN]), runLifecycleAgentNow);
 
 module.exports = router;

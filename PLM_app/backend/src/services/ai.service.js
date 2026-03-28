@@ -142,6 +142,38 @@ function fallbackConflicts(openECOs) {
   };
 }
 
+function normalizeQualityScore(result) {
+  const fallback = {
+    total_score: 6,
+    max_score: 10,
+    grade: 'FAIR',
+    blocking: false,
+    improvements: ['Refine description with business impact details'],
+    ready_to_submit: true,
+    summary: 'Fallback quality assessment used due to AI output format mismatch.',
+  };
+
+  if (!result || typeof result !== 'object') return fallback;
+
+  const total = Number(result.total_score);
+  const normalizedTotal = Number.isFinite(total) ? Math.max(0, Math.min(10, Math.round(total))) : fallback.total_score;
+  const improvements = Array.isArray(result.improvements)
+    ? result.improvements.map((v) => String(v)).filter(Boolean)
+    : fallback.improvements;
+
+  return {
+    total_score: normalizedTotal,
+    max_score: 10,
+    grade: typeof result.grade === 'string' ? result.grade : (normalizedTotal >= 8 ? 'GOOD' : normalizedTotal >= 6 ? 'FAIR' : 'POOR'),
+    blocking: typeof result.blocking === 'boolean' ? result.blocking : normalizedTotal <= 4,
+    improvements,
+    ready_to_submit: typeof result.ready_to_submit === 'boolean' ? result.ready_to_submit : normalizedTotal >= 6,
+    summary: typeof result.summary === 'string' && result.summary.trim().length > 0
+      ? result.summary
+      : `Draft quality score is ${normalizedTotal}/10.`,
+  };
+}
+
 // ═══════════════════════════════════════════════════════
 // FEATURE 1 — ECO DESCRIPTION GENERATOR
 // ═══════════════════════════════════════════════════════
@@ -515,6 +547,8 @@ ${description || '(No description provided)'}
     };
   }
 
+  result = normalizeQualityScore(result);
+
   const latency = Date.now() - start;
 
   await storeAiResult({
@@ -635,7 +669,54 @@ async function generateTemplateSuggestion({
   currentPrices,
 }) {
   if (!historicalECOs || historicalECOs.length === 0) {
-    return null;
+    const suggestion = ecoType === 'PRODUCT'
+      ? {
+          has_suggestion: true,
+          confidence: 'MEDIUM',
+          insight: `No historical ECOs found for ${productName}. A starter template is generated from current pricing baseline.`,
+          pattern_detected: 'Bootstrap pricing optimization template',
+          based_on_ecos: 0,
+          suggested_title_prefix: `Optimize ${productName} pricing alignment`,
+          suggested_changes: [
+            {
+              fieldName: 'Sale Price',
+              oldValue: currentPrices?.salePrice ?? 0,
+              newValue: Number(currentPrices?.salePrice ?? 0) + 5,
+              changeType: 'CHANGED',
+            },
+            {
+              fieldName: 'Cost Price',
+              oldValue: currentPrices?.costPrice ?? 0,
+              newValue: Number(currentPrices?.costPrice ?? 0) + 2,
+              changeType: 'CHANGED',
+            },
+          ],
+        }
+      : {
+          has_suggestion: true,
+          confidence: 'MEDIUM',
+          insight: `No historical ECOs found for ${productName}. A starter BOM template is generated from current component state.`,
+          pattern_detected: 'Bootstrap BOM optimization template',
+          based_on_ecos: 0,
+          suggested_title_prefix: `Adjust ${productName} BOM efficiency`,
+          suggested_changes: (currentBOMComponents || []).slice(0, 2).map((c) => ({
+            fieldName: c.componentName,
+            oldValue: c.quantity,
+            newValue: Number(c.quantity || 0) + 1,
+            changeType: 'CHANGED',
+          })),
+        };
+
+    await storeAiResult({
+      userId,
+      featureType: 'TEMPLATE_SUGGESTION',
+      input: { productId, productName, ecoType, historicalECOsCount: 0 },
+      output: suggestion,
+      latencyMs: 0,
+      cached: true,
+    });
+
+    return suggestion;
   }
 
   const systemPrompt = `

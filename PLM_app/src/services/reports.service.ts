@@ -33,4 +33,12 @@ export const reportsService = {
     const { data } = await api.get('/ai/results');
     return data;
   },
+  async getAgentAlerts() {
+    const { data } = await api.get('/reports/agent-alerts');
+    return data.data;
+  },
+  async runAgentNow() {
+    const { data } = await api.post('/reports/agent/run');
+    return data.data;
+  },
 };

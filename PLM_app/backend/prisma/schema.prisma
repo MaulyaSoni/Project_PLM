@@ -157,6 +157,27 @@ model ECO {
   approvals          ECOApproval[]
   auditLogs          AuditLog[]
   aiResults          AiResult[]
+  agentActions       AgentAction[]
+}
+
+model AgentAction {
+  id           String   @id @default(uuid())
+  ecoId        String   @map("eco_id")
+  actionType   String   @map("action_type")
+  status       String   @default("EXECUTED")
+  reason       String?
+  message      String
+  metadata     Json?
+  source       String   @default("scheduler")
+  scheduledFor DateTime? @map("scheduled_for")
+  executedAt   DateTime? @map("executed_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  eco          ECO      @relation(fields: [ecoId], references: [id], onDelete: Cascade)
+
+  @@index([ecoId, actionType, createdAt])
+  @@map("agent_actions")
 }
 
 model AiResult {

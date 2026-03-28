@@ -8,6 +8,8 @@
     "start": "node server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:baseline": "prisma migrate resolve --applied 20260328120000_baseline",
     "prisma:seed": "prisma db seed",
     "test-db": "node test-db.js"
   },
@@ -19,6 +21,7 @@
     "express": "^4.21.2",
     "groq-sdk": "^1.1.1",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^4.2.1",
     "prisma": "^6.6.0"
   },
   "devDependencies": {

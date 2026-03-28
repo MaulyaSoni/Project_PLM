@@ -87,6 +87,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const [templateSuggestion, setTemplateSuggestion] = useState<TemplateSuggestion | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [qualityScore, setQualityScore] = useState<QualityScore | null>(null);
+  const [animatedQualityScore, setAnimatedQualityScore] = useState(0);
   const [scoringDraft, setScoringDraft] = useState(false);
 
   // Product changes
@@ -159,6 +160,27 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     if (!open || !productId || !type) return;
     fetchTemplateSuggestion();
   }, [open, productId, type]);
+
+  useEffect(() => {
+    if (!qualityScore?.total_score) {
+      setAnimatedQualityScore(0);
+      return;
+    }
+
+    const target = Math.max(0, Math.min(10, Number(qualityScore.total_score) || 0));
+    let current = 0;
+    setAnimatedQualityScore(0);
+
+    const timer = window.setInterval(() => {
+      current += 1;
+      setAnimatedQualityScore(Math.min(current, target));
+      if (current >= target) {
+        window.clearInterval(timer);
+      }
+    }, 70);
+
+    return () => window.clearInterval(timer);
+  }, [qualityScore?.total_score]);
 
   const selectedProduct = products.find(p => p.id === productId);
   const selectedBOM = boms.find(b => b.id === bomId);
@@ -484,7 +506,11 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
             </div>
 
             {loadingTemplate && (
-              <p className="text-xs text-muted-foreground">Loading AI template suggestion...</p>
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-3 overflow-hidden animate-fade-in">
+                <div className="h-3 w-36 rounded bg-gradient-to-r from-muted via-muted-foreground/20 to-muted bg-[length:200%_100%] animate-shimmer" />
+                <div className="h-2.5 w-full rounded bg-gradient-to-r from-muted via-muted-foreground/15 to-muted bg-[length:200%_100%] animate-shimmer" />
+                <div className="h-2.5 w-3/4 rounded bg-gradient-to-r from-muted via-muted-foreground/15 to-muted bg-[length:200%_100%] animate-shimmer" />
+              </div>
             )}
 
             {templateSuggestion?.has_suggestion && (
@@ -637,7 +663,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                         ? 'text-amber-400'
                         : 'text-green-400'
                   )}>
-                    {qualityScore.total_score}/10
+                    {animatedQualityScore}/10
                   </span>
                 </div>
 
@@ -647,7 +673,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                       key={i}
                       className={cn(
                         'h-2 flex-1 rounded-sm transition-all',
-                        i < qualityScore.total_score
+                        i < animatedQualityScore
                           ? qualityScore.blocking
                             ? 'bg-red-400'
                             : qualityScore.total_score <= 5
@@ -655,6 +681,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
                               : 'bg-green-400'
                           : 'bg-slate-700'
                       )}
+                      style={{ transitionDelay: `${i * 30}ms` }}
                     />
                   ))}
                 </div>

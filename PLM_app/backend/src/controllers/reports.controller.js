@@ -1,5 +1,6 @@
 const { prisma } = require('../lib/prisma');
 const { mapECO, mapBOM, toDateOnly } = require('./_mappers');
+const { runEcoLifecycleAgent, getAgentAlerts } = require('../services/lifecycleAgent.service');
 
 const serverError = (res, error) => {
   const message = process.env.NODE_ENV === 'production'
@@ -266,6 +267,24 @@ const getUsers = async (_req, res) => {
   }
 };
 
+const getLifecycleAgentAlerts = async (_req, res) => {
+  try {
+    const data = await getAgentAlerts();
+    return res.json({ data });
+  } catch (error) {
+    return serverError(res, error);
+  }
+};
+
+const runLifecycleAgentNow = async (_req, res) => {
+  try {
+    const result = await runEcoLifecycleAgent({ source: 'manual' });
+    return res.json({ data: result, message: 'Lifecycle agent execution completed' });
+  } catch (error) {
+    return serverError(res, error);
+  }
+};
+
 module.exports = {
   getECOReport,
   getVersionHistory,
@@ -275,4 +294,6 @@ module.exports = {
   getActiveMatrix,
   getAuditLog,
   getUsers,
+  getLifecycleAgentAlerts,
+  runLifecycleAgentNow,
 };

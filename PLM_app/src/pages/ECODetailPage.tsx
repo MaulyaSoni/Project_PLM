@@ -672,13 +672,24 @@ export default function ECODetailPage() {
                   <div className="space-y-3">
                     <p className="text-xs text-slate-300">{precedents.pattern_summary}</p>
                     {(precedents.precedents || []).slice(0, 2).map((p: PrecedentItem, i: number) => (
-                      <div key={i} className="rounded border border-slate-700/50 bg-slate-900/50 p-2 space-y-1">
+                      <div key={i} className="rounded border border-slate-700/50 bg-slate-900/50 p-2 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-medium text-slate-200 truncate">{p.eco_title}</span>
                           <Badge className="text-xs bg-green-900/40 text-green-400 border-green-500/30">
                             {p.similarity_score}% match
                           </Badge>
                         </div>
+
+                        <div className="space-y-1">
+                          <div className="h-1.5 w-full rounded-full bg-slate-700/60 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 transition-all duration-500"
+                              style={{ width: `${Math.max(0, Math.min(100, Number(p.similarity_score) || 0))}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500">Confidence</p>
+                        </div>
+
                         <p className="text-xs text-slate-400 italic">"{p.approver_comment}"</p>
                         <p className="text-xs text-purple-400">Lesson: {p.key_lesson}</p>
                         <p className="text-xs text-slate-500">Approved in {p.days_to_approve} day(s)</p>

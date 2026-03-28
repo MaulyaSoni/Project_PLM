@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Download, BarChart3, Archive, Grid2x2 } from 'lucide-react';
+import { Download, BarChart3, Archive, Grid2x2, RefreshCcw, Loader2 } from 'lucide-react';
 import { reportsService } from '@/services/reports.service';
 import { useProductStore } from '@/stores/useProductStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -79,6 +79,21 @@ type AiParsedOutput = {
   summary?: string;
 };
 
+type AgentAlertItem = {
+  id: string;
+  title: string;
+  productName: string;
+  assignedToName: string;
+  daysInReview: number;
+  createdAt: string;
+};
+
+type AgentAlertsPayload = {
+  thresholds: { reviewThresholdHours: number };
+  stuckCount: number;
+  stuckEcos: AgentAlertItem[];
+};
+
 export default function ReportsPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -96,6 +111,28 @@ export default function ReportsPage() {
   const [selectedArchivedProduct, setSelectedArchivedProduct] = useState<ArchivedProduct | null>(null);
   const [expandedMatrix, setExpandedMatrix] = useState<string | null>(null);
   const [aiResults, setAiResults] = useState<AiResultRow[]>([]);
+  const [activeTab, setActiveTab] = useState('matrix');
+  const [refreshingAi, setRefreshingAi] = useState(false);
+  const [lastAiRefreshAt, setLastAiRefreshAt] = useState<Date | null>(null);
+  const [agentAlerts, setAgentAlerts] = useState<AgentAlertsPayload | null>(null);
+  const [runningAgent, setRunningAgent] = useState(false);
+
+  const loadAiResults = useCallback(async (silent = false) => {
+    if (user?.role !== 'ADMIN') return;
+    if (!silent) setRefreshingAi(true);
+    try {
+      const res = await reportsService.getAiResults();
+      const rows = (res?.data || []) as AiResultRow[];
+      setAiResults(
+        [...rows].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      );
+      setLastAiRefreshAt(new Date());
+    } catch {
+      if (!silent) setAiResults([]);
+    } finally {
+      if (!silent) setRefreshingAi(false);
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     fetchProducts();
@@ -104,9 +141,28 @@ export default function ReportsPage() {
     reportsService.getArchivedProducts().then(setArchivedProducts);
     reportsService.getActiveMatrix().then(setActiveMatrix);
     if (user?.role === 'ADMIN') {
-      reportsService.getAiResults().then(setAiResults).catch(() => setAiResults([]));
+      loadAiResults();
+      reportsService.getAgentAlerts().then(setAgentAlerts).catch(() => setAgentAlerts(null));
     }
-  }, [fetchProducts, user?.role]);
+  }, [fetchProducts, user?.role, loadAiResults]);
+
+  const runLifecycleAgent = async () => {
+    setRunningAgent(true);
+    try {
+      await reportsService.runAgentNow();
+      await Promise.all([loadAiResults(), reportsService.getAgentAlerts().then(setAgentAlerts)]);
+    } finally {
+      setRunningAgent(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role !== 'ADMIN' || activeTab !== 'ai-observatory') return;
+    const interval = window.setInterval(() => {
+      loadAiResults(true);
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [user?.role, activeTab, loadAiResults]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -223,7 +279,7 @@ export default function ReportsPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="matrix" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className={cn(
           'w-full h-auto bg-muted/50 border border-border shadow-sm rounded-xl p-2 mb-8 font-medium',
           user?.role === 'ADMIN' ? 'grid grid-cols-2 md:grid-cols-7' : 'grid grid-cols-2 md:grid-cols-6'
@@ -241,6 +297,52 @@ export default function ReportsPage() {
 
         {user?.role === 'ADMIN' && (
           <TabsContent value="ai-observatory" className="animate-slide-up space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                Live refresh every 15s
+                {lastAiRefreshAt && (
+                  <span>• Last sync {lastAiRefreshAt.toLocaleTimeString()}</span>
+                )}
+              </div>
+              <Button size="sm" variant="outline" className="h-8" onClick={() => loadAiResults()} disabled={refreshingAi}>
+                {refreshingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                <span className="ml-2 text-xs">Refresh</span>
+              </Button>
+            </div>
+
+            <Card className="bg-card border-border">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Lifecycle Agent</p>
+                    <p className="text-sm font-medium">
+                      {agentAlerts?.stuckCount || 0} ECO(s) beyond {agentAlerts?.thresholds?.reviewThresholdHours || 24}h in review
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={runLifecycleAgent} disabled={runningAgent}>
+                    {runningAgent ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                    <span className="ml-2">Run Agent Now</span>
+                  </Button>
+                </div>
+
+                {(agentAlerts?.stuckEcos || []).length > 0 ? (
+                  <div className="space-y-2">
+                    {agentAlerts?.stuckEcos.slice(0, 3).map((item) => (
+                      <div key={item.id} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                        <p className="text-sm font-medium text-foreground">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.productName} • Assigned to {item.assignedToName} • {item.daysInReview} day(s) in review
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No current lifecycle bottlenecks detected.</p>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total AI Calls</p><p className="text-2xl font-semibold">{aiStats.total}</p></CardContent></Card>
               <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Latency</p><p className="text-2xl font-semibold">{aiStats.avgLatency} ms</p></CardContent></Card>

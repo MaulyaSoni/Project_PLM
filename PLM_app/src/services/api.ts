@@ -7,6 +7,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const redirectToLogin = (message: string) => {
+  localStorage.removeItem('plm_token');
+  toast.error(message);
+  window.location.href = '/login';
+};
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('plm_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -17,11 +23,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('plm_token');
-      toast.error('Session expired, please login again');
-      window.location.href = '/login';
+      redirectToLogin('Session expired, please login again');
     } else if (error.response?.status === 403) {
-      toast.error(error.response?.data?.error || 'You do not have permission to perform this action');
+      redirectToLogin(error.response?.data?.error || 'Access denied. Please login again.');
     } else if (!error.response) {
       toast.error('Connection failed. Please check your network.');
     }
