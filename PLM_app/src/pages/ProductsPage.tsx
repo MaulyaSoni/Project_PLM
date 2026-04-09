@@ -86,7 +86,7 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* PLM Info Banner */}
+      {/* NIYANTRAK AI Info Banner */}
       <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
         <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-card border border-foreground/10 shadow-xl p-6">
           <div className="absolute -top-24 -right-12 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
@@ -96,7 +96,7 @@ export default function ProductsPage() {
               <h3 className="font-semibold text-lg text-foreground">What Does It Do?</h3>
             </div>
             <p className="text-foreground leading-relaxed mb-4 font-medium text-[15px]">
-              This platform manages products and their changes in a structured and controlled way. A Product Lifecycle Management (PLM) system that enables secure, version-controlled, and approval-driven changes.
+              NIYANTRAK AI manages products and their changes in a structured and controlled way. It enables secure, version-controlled, and approval-driven lifecycle changes.
             </p>
             <p className="text-foreground/80 leading-relaxed text-sm">
               Instead of allowing direct edits, it ensures that every modification goes through a proper approval process before being applied. It maintains version history, tracks changes, and ensures that only approved data is used in operations.

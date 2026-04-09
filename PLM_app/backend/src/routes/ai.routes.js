@@ -28,6 +28,14 @@ router.post(
   c.detectConflicts
 );
 
+// Predictive conflict hotspot scan — ENGINEERING + ADMIN (before ECO creation)
+router.get(
+  '/conflict-hotspots',
+  authenticate,
+  authorize([ROLES.ADMIN, ROLES.ENGINEERING]),
+  c.getConflictHotspots
+);
+
 // Quality score — Engineering + Admin
 router.post(
   '/quality-score',

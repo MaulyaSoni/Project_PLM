@@ -67,18 +67,6 @@ type AiResultRow = {
   user?: { name: string; role: string } | null;
 };
 
-type AiParsedOutput = {
-  total_score?: number;
-  grade?: string;
-  complexity_level?: string;
-  estimated_approval_days?: number;
-  suggested_changes?: unknown[];
-  confidence?: string;
-  precedents?: Array<{ similarity_score?: number }>;
-  precedent_count?: number;
-  summary?: string;
-};
-
 type AgentAlertItem = {
   id: string;
   title: string;
@@ -201,68 +189,56 @@ export default function ReportsPage() {
     return { componentChanges, operationChanges };
   };
 
-  const featureBadge = (featureType: string) => {
-    const map: Record<string, { label: string; cls: string }> = {
-      QUALITY_SCORE: { label: 'Quality Score', cls: 'bg-blue-900/40 text-blue-300 border-blue-500/30' },
-      COMPLEXITY_ESTIMATE: { label: 'Complexity', cls: 'bg-amber-900/40 text-amber-300 border-amber-500/30' },
-      TEMPLATE_SUGGESTION: { label: 'Template', cls: 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-500/30' },
-      PRECEDENT_MATCH: { label: 'Precedent', cls: 'bg-green-900/40 text-green-300 border-green-500/30' },
-      IMPACT_ANALYSIS: { label: 'Impact', cls: 'bg-red-900/40 text-red-300 border-red-500/30' },
-      CONFLICT_DETECTION: { label: 'Conflict', cls: 'bg-orange-900/40 text-orange-300 border-orange-500/30' },
-      DESCRIPTION: { label: 'Description', cls: 'bg-slate-900/40 text-slate-300 border-slate-500/30' },
-    };
-    return map[featureType] || { label: featureType, cls: 'bg-muted text-muted-foreground border-border' };
+  const FEATURE_META: Record<string, { label: string; bg: string; text: string; border: string }> = {
+    QUALITY_SCORE: { label: 'Quality Score', bg: 'bg-blue-950/40', text: 'text-blue-400', border: 'border-blue-500/30' },
+    COMPLEXITY_ESTIMATE: { label: 'Complexity', bg: 'bg-amber-950/40', text: 'text-amber-400', border: 'border-amber-500/30' },
+    TEMPLATE_SUGGESTION: { label: 'Template', bg: 'bg-purple-950/40', text: 'text-purple-400', border: 'border-purple-500/30' },
+    PRECEDENT_MATCH: { label: 'Precedent', bg: 'bg-green-950/40', text: 'text-green-400', border: 'border-green-500/30' },
+    IMPACT_ANALYSIS: { label: 'Impact', bg: 'bg-red-950/40', text: 'text-red-400', border: 'border-red-500/30' },
+    CONFLICT_DETECTION: { label: 'Conflict', bg: 'bg-orange-950/40', text: 'text-orange-400', border: 'border-orange-500/30' },
+    DESCRIPTION: { label: 'Description', bg: 'bg-slate-800/40', text: 'text-slate-400', border: 'border-slate-600/30' },
   };
 
-  const summarizeAiOutput = (row: AiResultRow) => {
-    let parsed: AiParsedOutput | null = null;
+  const getOutputSummary = (result: AiResultRow) => {
     try {
-      parsed = JSON.parse(row.output || '{}') as AiParsedOutput;
+      const out = JSON.parse(result.output || '{}') as Record<string, any>;
+      switch (result.featureType) {
+        case 'QUALITY_SCORE':
+          return `Score: ${out.total_score}/10 — ${out.grade}`;
+        case 'COMPLEXITY_ESTIMATE':
+          return `${out.complexity_level} — ~${out.estimated_approval_days_range || out.estimated_approval_days} days`;
+        case 'TEMPLATE_SUGGESTION':
+          return out.has_suggestion
+            ? `${out.suggested_changes?.length || 0} changes suggested (${out.confidence})`
+            : 'No pattern found';
+        case 'PRECEDENT_MATCH':
+          return out.has_precedents
+            ? `${out.precedent_count} match(es) — top: ${out.precedents?.[0]?.similarity_score}%`
+            : 'No precedents';
+        case 'IMPACT_ANALYSIS':
+          return `${out.risk_level} risk · ${out.urgency_score}/10 urgency`;
+        case 'CONFLICT_DETECTION':
+          return out.has_conflicts ? `${out.conflict_count} conflict(s) detected` : 'Clean — no conflicts';
+        default:
+          return 'Result stored';
+      }
     } catch {
-      parsed = null;
+      return '—';
     }
-
-    if (!parsed) return 'No summary';
-
-    if (row.featureType === 'QUALITY_SCORE') {
-      return `Score: ${parsed.total_score ?? '-'} / 10 - ${parsed.grade || 'N/A'}`;
-    }
-    if (row.featureType === 'COMPLEXITY_ESTIMATE') {
-      return `${parsed.complexity_level || 'N/A'} - ~${parsed.estimated_approval_days || '?'} days`;
-    }
-    if (row.featureType === 'TEMPLATE_SUGGESTION') {
-      return `${parsed.suggested_changes?.length || 0} changes suggested (${parsed.confidence || 'N/A'} confidence)`;
-    }
-    if (row.featureType === 'PRECEDENT_MATCH') {
-      const top = parsed.precedents?.[0]?.similarity_score;
-      return `${parsed.precedent_count || parsed.precedents?.length || 0} precedents found${top ? ` (${top}% match)` : ''}`;
-    }
-    if (parsed.summary) return String(parsed.summary);
-    return 'AI output captured';
   };
 
-  const aiStats = useMemo(() => {
-    if (!aiResults.length) {
-      return { total: 0, avgLatency: 0, cacheHitRate: 0, mostUsedFeature: 'N/A' };
-    }
-
-    const total = aiResults.length;
-    const avgLatency = Math.round(
-      aiResults.reduce((sum, r) => sum + (Number(r.latencyMs) || 0), 0) / total
-    );
-    const cacheHitRate = Math.round(
-      (aiResults.filter((r) => r.cached).length / total) * 100
-    );
-
-    const countByFeature = aiResults.reduce((acc: Record<string, number>, row) => {
-      acc[row.featureType] = (acc[row.featureType] || 0) + 1;
-      return acc;
-    }, {});
-    const mostUsedFeature = Object.entries(countByFeature)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-
-    return { total, avgLatency, cacheHitRate, mostUsedFeature };
-  }, [aiResults]);
+  const totalCalls = aiResults.length;
+  const avgLatency = aiResults.length
+    ? Math.round(aiResults.reduce((s, r) => s + (r.latencyMs || 0), 0) / aiResults.length)
+    : 0;
+  const cacheHits = aiResults.filter((r) => r.cached).length;
+  const cacheHitRate = aiResults.length ? Math.round((cacheHits / aiResults.length) * 100) : 0;
+  const featureCounts = aiResults.reduce((acc: Record<string, number>, r) => {
+    acc[r.featureType] = (acc[r.featureType] || 0) + 1;
+    return acc;
+  }, {});
+  const topFeatureKey = Object.entries(featureCounts).sort(([, a], [, b]) => b - a)[0]?.[0];
+  const topFeatureLabel = topFeatureKey ? (FEATURE_META[topFeatureKey]?.label || topFeatureKey) : 'N/A';
 
   return (
     <div className="animate-fade-in text-foreground pb-12">
@@ -343,53 +319,89 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total AI Calls</p><p className="text-2xl font-semibold">{aiStats.total}</p></CardContent></Card>
-              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Avg Latency</p><p className="text-2xl font-semibold">{aiStats.avgLatency} ms</p></CardContent></Card>
-              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cache Hit Rate</p><p className="text-2xl font-semibold">{aiStats.cacheHitRate}%</p></CardContent></Card>
-              <Card className="bg-card border-border"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Most Used Feature</p><p className="text-lg font-semibold">{featureBadge(aiStats.mostUsedFeature).label}</p></CardContent></Card>
-            </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-4 gap-4">
+                {[
+                  { label: 'Total AI Calls', value: totalCalls, color: 'text-blue-400' },
+                  {
+                    label: 'Avg Latency',
+                    value: `${avgLatency}ms`,
+                    color: avgLatency < 1000 ? 'text-green-400' : avgLatency < 3000 ? 'text-amber-400' : 'text-red-400',
+                  },
+                  { label: 'Cache Hit Rate', value: `${cacheHitRate}%`, color: 'text-purple-400' },
+                  { label: 'Top Feature', value: topFeatureLabel, color: 'text-amber-400' },
+                ].map((kpi, i) => (
+                  <div key={i} className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+                    <p className="text-xs text-slate-500 mb-1">{kpi.label}</p>
+                    <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
 
-            <Card className="bg-card border-border overflow-hidden">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead>Feature</TableHead>
-                      <TableHead>ECO</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Score / Summary</TableHead>
-                      <TableHead>Latency</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {aiResults.map((row) => {
-                      const badge = featureBadge(row.featureType);
-                      const latency = Number(row.latencyMs) || 0;
-                      const latencyClass = latency < 1000 ? 'text-green-400' : latency <= 3000 ? 'text-amber-400' : 'text-red-400';
+              <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                <div className="bg-slate-900/80 border-b border-slate-700/50 px-3 py-2.5 flex items-center justify-between">
+                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">AI Activity Feed</p>
+                  <p className="text-xs text-slate-600">Last {aiResults.length} calls</p>
+                </div>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-800/50">
+                      {['Feature', 'ECO', 'User', 'Output', 'Latency', 'Time'].map((h) => (
+                        <th key={h} className="text-left text-xs text-slate-500 uppercase tracking-wider px-3 py-2">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {aiResults.map((result) => {
+                      const meta = FEATURE_META[result.featureType] || FEATURE_META.DESCRIPTION;
+                      const latencyColor = !result.latencyMs
+                        ? 'text-slate-600'
+                        : result.latencyMs < 1000
+                          ? 'text-green-400'
+                          : result.latencyMs < 3000
+                            ? 'text-amber-400'
+                            : 'text-red-400';
+
                       return (
-                        <TableRow key={row.id} className="border-border">
-                          <TableCell><Badge variant="outline" className={badge.cls}>{badge.label}</Badge></TableCell>
-                          <TableCell>{row.eco?.title || 'System event'}</TableCell>
-                          <TableCell>{row.user?.name || 'System'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{summarizeAiOutput(row)}</TableCell>
-                          <TableCell className={latencyClass}>{latency ? `${latency} ms` : '-'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString()}</TableCell>
-                        </TableRow>
+                        <tr key={result.id} className="hover:bg-slate-800/20 transition-colors">
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs px-2 py-0.5 rounded-full border ${meta.bg} ${meta.text} ${meta.border}`}>
+                              {meta.label}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 max-w-[8rem]">
+                            <p className="text-xs text-slate-300 truncate">{result.eco?.title || '—'}</p>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <p className="text-xs text-slate-400">{result.user?.name || '—'}</p>
+                          </td>
+                          <td className="px-3 py-2.5 max-w-[12rem]">
+                            <p className="text-xs text-slate-300 truncate">{getOutputSummary(result)}</p>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs font-mono ${latencyColor}`}>
+                              {result.cached ? 'cached' : result.latencyMs ? `${result.latencyMs}ms` : '—'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <p className="text-xs text-slate-500">{new Date(result.createdAt).toLocaleTimeString()}</p>
+                          </td>
+                        </tr>
                       );
                     })}
-                    {aiResults.length === 0 && (
-                      <TableRow className="border-border">
-                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
-                          No AI activity recorded yet.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  </tbody>
+                </table>
+
+                {aiResults.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-sm text-slate-500">No AI activity yet</p>
+                    <p className="text-xs text-slate-600 mt-1">Activity appears here as engineers use AI features</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
         )}
 

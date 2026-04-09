@@ -44,7 +44,7 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-semibold text-foreground tracking-tight">
-            PLM Enterprise
+            NIYANTRAK AI
           </CardTitle>
           <p className="text-sm text-muted-foreground font-medium">
             Sign in to your account

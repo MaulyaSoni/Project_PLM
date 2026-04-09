@@ -1,5 +1,6 @@
 const { prisma } = require('../lib/prisma');
 const ai = require('../services/ai.service');
+const { normalizeText, similarEcosByMeaning, syncEmbeddingsForProduct } = require('../services/semantic.service');
 
 const normalizeDraftChanges = (changes = []) => {
   if (!Array.isArray(changes)) return [];
@@ -218,6 +219,57 @@ exports.detectConflicts = async (req, res) => {
   }
 };
 
+// PREDICTIVE CONFLICT PREVENTION (before ECO creation)
+exports.getConflictHotspots = async (req, res) => {
+  try {
+    const { productId } = req.query;
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required' });
+    }
+
+    const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const doneEcos = await prisma.eCO.findMany({
+      where: {
+        productId: String(productId),
+        status: 'DONE',
+        createdAt: { gte: since },
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        productChanges: true,
+        bomComponentChanges: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 80,
+    });
+
+    const counts = new Map();
+    for (const eco of doneEcos) {
+      const changes = normalizeDraftChanges(eco.productChanges || eco.bomComponentChanges || []);
+      for (const c of changes) {
+        const key = String(c.fieldName || c.componentName || c.field || 'unknown').toLowerCase();
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+
+    const hotspots = Array.from(counts.entries())
+      .filter(([, hits]) => hits >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([field, hits]) => ({
+        field,
+        hitsLast60Days: hits,
+        warning: `${field} has been modified ${hits} times in 60 days. Coordinate before raising another ECO.`,
+      }));
+
+    return res.json({ success: true, data: { hotspots } });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+};
+
 // QUALITY SCORE
 exports.scoreECODraft = async (req, res) => {
   try {
@@ -362,12 +414,23 @@ exports.getTemplateSuggestion = async (req, res) => {
     const activeVersion = product.versions[0];
     const activeBOM = product.boms[0];
 
+    const learningRecords = await prisma.templateLearningRecord.findMany({
+      where: { productId: String(productId), ecoType: String(ecoType) },
+      orderBy: [
+        { outcomeQualityScore: 'desc' },
+        { cycleTimeDays: 'asc' },
+        { createdAt: 'desc' },
+      ],
+      take: 8,
+    });
+
     const result = await ai.generateTemplateSuggestion({
       userId: req.user.id,
       productId: String(productId),
       productName: product.name,
       ecoType: String(ecoType),
       historicalECOs,
+      learningRecords,
       currentBOMComponents: activeBOM?.components || [],
       currentPrices: activeVersion
         ? { salePrice: activeVersion.salePrice, costPrice: activeVersion.costPrice }
@@ -707,45 +770,44 @@ exports.searchSimilarECOs = async (req, res) => {
       return res.status(400).json({ error: 'ecoTitle, ecoType and productId are required' });
     }
 
-    const doneECOs = await prisma.eCO.findMany({
-      where: {
-        status: 'DONE',
-        productId: String(productId),
-      },
-      include: {
-        approvals: { orderBy: { createdAt: 'desc' }, take: 1 },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 25,
+    const normalizedChanges = normalizeDraftChanges(changes);
+    await syncEmbeddingsForProduct(String(productId));
+    const text = normalizeText({
+      title: ecoTitle,
+      description: description || '',
+      changes: normalizedChanges,
     });
 
-    const currentECO = {
-      id: ecoId || null,
-      title: ecoTitle,
-      type: ecoType,
+    const rows = await similarEcosByMeaning({
+      ecoId: ecoId || null,
       productId: String(productId),
-      description: description || '',
-      changes: normalizeDraftChanges(changes),
-    };
+      text,
+      limit: 5,
+    });
 
-    const candidateECOs = doneECOs.map((eco) => ({
-      id: eco.id,
-      title: eco.title,
-      type: eco.type,
-      productId: eco.productId,
-      description: eco.description || '',
-      changes: normalizeDraftChanges(eco.productChanges || eco.bomComponentChanges || []),
-      outcome: eco.status === 'DONE' ? 'APPLIED' : eco.status,
-      timelineDays: computeTimelineDays(eco),
-      appliedFixes: extractAppliedFixes(eco),
+    const topSimilar = rows.map((row) => ({
+      eco_id: row.id,
+      eco_title: row.title,
+      match_confidence: Math.max(1, Math.min(99, Math.round(Number(row.similarity || 0) * 100))),
+      outcome: row.status,
+      timeline_days: 0,
+      applied_fixes: ['Use approved validation and rollout checklist from this ECO'],
+      reusable_template: {
+        suggested_title: `${ecoType} update inspired by ${row.title}`,
+        suggested_description: row.description || '',
+        suggested_changes: normalizedChanges,
+      },
     }));
 
-    const result = await ai.searchSimilarECOs({
-      ecoId: ecoId || null,
-      userId: req.user.id,
-      currentECO,
-      candidateECOs,
-    });
+    const result = {
+      top_similar_ecos: topSimilar,
+      reusable_template: topSimilar[0]?.reusable_template || {
+        suggested_title: ecoTitle,
+        suggested_description: description || '',
+        suggested_changes: normalizedChanges,
+      },
+      search_mode: 'semantic_embedding_pgvector',
+    };
 
     return res.json({ success: true, data: result });
   } catch (e) {
@@ -761,46 +823,44 @@ exports.getSimilarECOsByECO = async (req, res) => {
     const eco = await prisma.eCO.findUnique({ where: { id: ecoId } });
     if (!eco) return res.status(404).json({ error: 'ECO not found' });
 
-    const doneECOs = await prisma.eCO.findMany({
-      where: {
-        status: 'DONE',
-        productId: eco.productId,
-        id: { not: eco.id },
-      },
-      include: {
-        approvals: { orderBy: { createdAt: 'desc' }, take: 1 },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 25,
+    const normalizedChanges = normalizeDraftChanges(eco.productChanges || eco.bomComponentChanges || []);
+    await syncEmbeddingsForProduct(eco.productId);
+    const text = normalizeText({
+      title: eco.title,
+      description: eco.description || '',
+      changes: normalizedChanges,
     });
 
-    const currentECO = {
-      id: eco.id,
-      title: eco.title,
-      type: eco.type,
+    const rows = await similarEcosByMeaning({
+      ecoId: eco.id,
       productId: eco.productId,
-      description: eco.description || '',
-      changes: normalizeDraftChanges(eco.productChanges || eco.bomComponentChanges || []),
-    };
+      text,
+      limit: 5,
+    });
 
-    const candidateECOs = doneECOs.map((item) => ({
-      id: item.id,
-      title: item.title,
-      type: item.type,
-      productId: item.productId,
-      description: item.description || '',
-      changes: normalizeDraftChanges(item.productChanges || item.bomComponentChanges || []),
-      outcome: item.status === 'DONE' ? 'APPLIED' : item.status,
-      timelineDays: computeTimelineDays(item),
-      appliedFixes: extractAppliedFixes(item),
+    const topSimilar = rows.map((row) => ({
+      eco_id: row.id,
+      eco_title: row.title,
+      match_confidence: Math.max(1, Math.min(99, Math.round(Number(row.similarity || 0) * 100))),
+      outcome: row.status,
+      timeline_days: 0,
+      applied_fixes: ['Use approved validation and rollout checklist from this ECO'],
+      reusable_template: {
+        suggested_title: `${eco.type} update inspired by ${row.title}`,
+        suggested_description: row.description || '',
+        suggested_changes: normalizedChanges,
+      },
     }));
 
-    const result = await ai.searchSimilarECOs({
-      ecoId: eco.id,
-      userId: req.user.id,
-      currentECO,
-      candidateECOs,
-    });
+    const result = {
+      top_similar_ecos: topSimilar,
+      reusable_template: topSimilar[0]?.reusable_template || {
+        suggested_title: eco.title,
+        suggested_description: eco.description || '',
+        suggested_changes: normalizedChanges,
+      },
+      search_mode: 'semantic_embedding_pgvector',
+    };
 
     return res.json({ success: true, data: result });
   } catch (e) {

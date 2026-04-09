@@ -26,7 +26,7 @@ export function AppSidebar() {
       <div className="h-16 flex items-center justify-center border-b border-border">
         <span className="font-semibold text-foreground text-lg tracking-tight flex items-center gap-2">
           <Layers className="h-5 w-5 text-primary" />
-          PLM Enterprise
+          NIYANTRAK AI
         </span>
       </div>
 

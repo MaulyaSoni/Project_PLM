@@ -476,7 +476,7 @@ async function generateImpactAnalysis({
   assignedApprover     // approver name
 }) {
   const systemPrompt = `
-You are an AI risk analyst integrated into a PLM (Product Lifecycle
+You are an AI risk analyst integrated into NIYANTRAK AI (Product Lifecycle
 Management) system at a manufacturing company. Your job is to analyze
 Engineering Change Orders and produce a structured risk and impact
 assessment to help approvers make faster, better-informed decisions.
@@ -586,7 +586,7 @@ async function detectECOConflicts({
   }
 
   const systemPrompt = `
-You are a conflict detection system for a PLM (Product Lifecycle Management)
+You are a conflict detection system for NIYANTRAK AI (Product Lifecycle Management)
 application. Your job is to analyze multiple Engineering Change Orders (ECOs)
 that are open simultaneously for the same product and identify conflicts,
 overlaps, or dependencies between them.
@@ -696,7 +696,7 @@ async function scoreECODraft({
 }) {
   const systemPrompt = `
 You are a quality reviewer for Engineering Change Orders in a
-manufacturing PLM system. Your job is to score ECO drafts before
+manufacturing NIYANTRAK AI system. Your job is to score ECO drafts before
 submission to ensure they meet professional standards.
 
 Score the ECO on these 5 dimensions (0-2 points each, max 10):
@@ -785,7 +785,7 @@ async function estimateComplexity({
   openECOsOnProduct,
 }) {
   const systemPrompt = `
-You are a complexity analysis engine for a manufacturing PLM system.
+You are a complexity analysis engine for a manufacturing NIYANTRAK AI system.
 Estimate how complex and time-consuming the approval process will be.
 Respond ONLY with valid JSON.
 `.trim();
@@ -865,9 +865,45 @@ async function generateTemplateSuggestion({
   productName,
   ecoType,
   historicalECOs,
+  learningRecords,
   currentBOMComponents,
   currentPrices,
 }) {
+  const outcomeLearned = Array.isArray(learningRecords) ? learningRecords : [];
+
+  if (outcomeLearned.length > 0) {
+    const best = outcomeLearned[0];
+    const learnedChanges = (historicalECOs || [])
+      .find((eco) => eco.id === best.ecoId)
+      ?.productChanges || (historicalECOs || []).find((eco) => eco.id === best.ecoId)?.bomComponentChanges || [];
+
+    const learnedSuggestion = {
+      has_suggestion: true,
+      confidence: 'HIGH',
+      insight: `Learned from ${outcomeLearned.length} approved outcomes. Top pattern reduced cycle time and improved quality score.`,
+      pattern_detected: best.normalizedPattern,
+      based_on_ecos: outcomeLearned.length,
+      suggested_title_prefix: `Outcome-optimized ${productName} ${ecoType} change`,
+      suggested_changes: Array.isArray(learnedChanges) ? learnedChanges.slice(0, 5) : [],
+      outcome_learning: {
+        best_quality_score: best.outcomeQualityScore,
+        best_cycle_time_days: best.cycleTimeDays,
+        approved_first_pass: best.approvedFirstPass,
+      },
+    };
+
+    await storeAiResult({
+      userId,
+      featureType: 'TEMPLATE_SUGGESTION',
+      input: { productId, productName, ecoType, historicalECOsCount: historicalECOs?.length || 0, learnedCount: outcomeLearned.length },
+      output: learnedSuggestion,
+      latencyMs: 0,
+      cached: true,
+    });
+
+    return learnedSuggestion;
+  }
+
   if (!historicalECOs || historicalECOs.length === 0) {
     const suggestion = ecoType === 'PRODUCT'
       ? {
@@ -920,7 +956,7 @@ async function generateTemplateSuggestion({
   }
 
   const systemPrompt = `
-You are a template suggestion engine for a PLM Engineering Change Order system.
+You are a template suggestion engine for a NIYANTRAK AI Engineering Change Order system.
 Analyze historical ECOs and suggest a likely starting template.
 Respond ONLY with valid JSON.
 `.trim();
@@ -981,7 +1017,7 @@ async function findApprovalPrecedents({
   }
 
   const systemPrompt = `
-You are a precedent matching engine for a PLM approval system.
+You are a precedent matching engine for a NIYANTRAK AI approval system.
 Find relevant historical approved ECO precedents.
 Respond ONLY with valid JSON.
 `.trim();
@@ -1053,7 +1089,7 @@ async function predictApprovalOutcome({
   assignedApprover,
 }) {
   const systemPrompt = `
-You are an approval risk prediction engine for a manufacturing PLM system.
+You are an approval risk prediction engine for a manufacturing NIYANTRAK AI system.
 Predict whether an ECO is likely to be approved or rejected and explain why.
 
 Respond ONLY with valid JSON in this exact shape:
@@ -1138,7 +1174,7 @@ async function generateBOMImpactGraph({
   openECOsCount,
 }) {
   const systemPrompt = `
-You are a BOM impact intelligence engine for a manufacturing PLM system.
+You are a BOM impact intelligence engine for a manufacturing NIYANTRAK AI system.
 Analyze proposed BOM changes and produce a dependency-aware impact graph.
 
 Respond ONLY with valid JSON in this exact shape:
@@ -1265,7 +1301,7 @@ async function rewriteECOCopy({
   changes,
 }) {
   const systemPrompt = `
-You are an ECO writing copilot for a manufacturing PLM system.
+You are an ECO writing copilot for a manufacturing NIYANTRAK AI system.
 Rewrite ECO copy into high-clarity, audit-ready language.
 
 Respond ONLY with valid JSON in this exact shape:

@@ -1,4 +1,4 @@
-# PLM App: Product Lifecycle Management Dashboard
+# NIYANTRAK AI: Product Lifecycle Intelligence Dashboard
 
 A modern, full-stack Product Lifecycle Management (PLM) application for managing Products, Bill of Materials (BOM), and Engineering Change Orders (ECO). It features an AI-powered engine to generate impact analysis and insights for engineering changes.
 

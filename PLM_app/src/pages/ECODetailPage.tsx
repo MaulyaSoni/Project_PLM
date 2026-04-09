@@ -38,7 +38,10 @@ type ImpactData = {
 type ComplexityData = {
   complexity_level?: string;
   estimated_approval_days_range?: string;
+  complexity_score?: number;
+  cached?: boolean;
   summary?: string;
+  factors?: Array<{ factor?: string; impact?: 'LOW' | 'MEDIUM' | 'HIGH' }>;
   acceleration_tips?: string[];
   risks?: string[];
 };
@@ -53,9 +56,11 @@ type PrecedentItem = {
 
 type PrecedentsData = {
   has_precedents?: boolean;
+  precedent_count?: number;
   pattern_summary?: string;
   precedents?: PrecedentItem[];
   recommendation?: string;
+  caution?: string;
   reason?: string;
 };
 
@@ -783,96 +788,206 @@ export default function ECODetailPage() {
           </Card>
 
           {loadingComplexity && (
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 text-xs text-muted-foreground flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Calculating complexity estimate...
+            <Card className="border-slate-700/50 animate-pulse">
+              <CardHeader className="pb-2">
+                <div className="h-3.5 bg-slate-700/60 rounded w-32" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="h-2 bg-slate-700/60 rounded" />
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} className="h-1.5 flex-1 rounded-full bg-slate-800" />
+                  ))}
+                </div>
+                <div className="h-2.5 bg-slate-800/60 rounded w-3/4" />
               </CardContent>
             </Card>
           )}
 
-          {complexity && (
-            <Card className={cn(
-              'border',
-              COMPLEXITY_COLORS[complexity.complexity_level]?.bg || 'bg-card',
-              COMPLEXITY_COLORS[complexity.complexity_level]?.border || 'border-border'
-            )}>
+          {complexity && !loadingComplexity && (
+            <Card
+              className={`border ${complexity.complexity_level === 'SIMPLE' ? 'border-green-500/30 bg-green-950/10' : complexity.complexity_level === 'MODERATE' ? 'border-blue-500/30 bg-blue-950/10' : complexity.complexity_level === 'COMPLEX' ? 'border-amber-500/30 bg-amber-950/10' : 'border-red-500/30 bg-red-950/10'}`}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-slate-400" />
-                  Complexity Estimate
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-slate-400" />
+                    Complexity Estimate
+                  </div>
+                  {complexity.cached && (
+                    <Badge variant="outline" className="text-xs border-slate-700 text-slate-500">
+                      cached
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Badge className={COMPLEXITY_COLORS[complexity.complexity_level]?.text || ''}>
+                  <span
+                    className={`text-sm font-bold ${complexity.complexity_level === 'SIMPLE' ? 'text-green-400' : complexity.complexity_level === 'MODERATE' ? 'text-blue-400' : complexity.complexity_level === 'COMPLEX' ? 'text-amber-400' : 'text-red-400'}`}
+                  >
                     {complexity.complexity_level}
-                  </Badge>
-                  <span className="text-xs text-slate-400">~{complexity.estimated_approval_days_range} days</span>
+                  </span>
+                  <div className="text-right">
+                    <p className="text-xs font-medium text-white">{complexity.estimated_approval_days_range} days</p>
+                    <p className="text-xs text-slate-500">estimated</p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-300">{complexity.summary}</p>
-                {(complexity.acceleration_tips || []).slice(0, 2).map((tip: string, i: number) => (
-                  <p key={i} className="text-xs text-slate-400">Tip: {tip}</p>
+
+                <div className="space-y-1">
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-full ${i < (complexity.complexity_score || 0) ? complexity.complexity_level === 'SIMPLE' ? 'bg-green-400' : complexity.complexity_level === 'MODERATE' ? 'bg-blue-400' : complexity.complexity_level === 'COMPLEX' ? 'bg-amber-400' : 'bg-red-400' : 'bg-slate-800'}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Simple</span>
+                    <span>Critical</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">{complexity.summary}</p>
+
+                {complexity.factors?.slice(0, 2).map((f, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span
+                      className={`text-xs flex-shrink-0 mt-0.5 ${f.impact === 'HIGH' ? 'text-red-400' : f.impact === 'MEDIUM' ? 'text-amber-400' : 'text-slate-400'}`}
+                    >
+                      ●
+                    </span>
+                    <p className="text-xs text-slate-400">{f.factor}</p>
+                  </div>
                 ))}
-                {(complexity.risks || []).slice(0, 1).map((risk: string, i: number) => (
-                  <p key={i} className="text-xs text-amber-400">Risk: {risk}</p>
+
+                {complexity.acceleration_tips?.length > 0 && (
+                  <div className="border-t border-slate-700/50 pt-2 space-y-1">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Speed up approval</p>
+                    {complexity.acceleration_tips.slice(0, 2).map((tip, i) => (
+                      <p key={i} className="text-xs text-blue-400 flex gap-1.5">
+                        <span className="flex-shrink-0">💡</span>
+                        {tip}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {complexity.risks?.slice(0, 1).map((risk, i) => (
+                  <div key={i} className="rounded bg-amber-950/20 border border-amber-500/20 px-2 py-1.5">
+                    <p className="text-xs text-amber-400 flex gap-1.5">
+                      <span>⚠</span>
+                      {risk}
+                    </p>
+                  </div>
                 ))}
               </CardContent>
             </Card>
           )}
 
           {(user?.role === 'APPROVER' || user?.role === 'ADMIN') && eco?.status === 'IN_REVIEW' && (
-            <Card className="border-purple-500/30 bg-purple-950/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-purple-400" />
-                  Approval Precedents
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingPrecedents ? (
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Searching historical ECOs...
-                  </div>
-                ) : precedents?.has_precedents ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-slate-300">{precedents.pattern_summary}</p>
-                    {(precedents.precedents || []).slice(0, 2).map((p: PrecedentItem, i: number) => (
-                      <div key={i} className="rounded border border-slate-700/50 bg-slate-900/50 p-2 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-slate-200 truncate">{p.eco_title}</span>
-                          <Badge className="text-xs bg-green-900/40 text-green-400 border-green-500/30">
-                            {p.similarity_score}% match
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="h-1.5 w-full rounded-full bg-slate-700/60 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 transition-all duration-500"
-                              style={{ width: `${Math.max(0, Math.min(100, Number(p.similarity_score) || 0))}%` }}
-                            />
-                          </div>
-                          <p className="text-[10px] uppercase tracking-wider text-slate-500">Confidence</p>
-                        </div>
-
-                        <p className="text-xs text-slate-400 italic">"{p.approver_comment}"</p>
-                        <p className="text-xs text-purple-400">Lesson: {p.key_lesson}</p>
-                        <p className="text-xs text-slate-500">Approved in {p.days_to_approve} day(s)</p>
+            <>
+              {loadingPrecedents && (
+                <Card className="border-purple-500/20 bg-purple-950/5 animate-pulse">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-purple-400/50" />
+                      <div className="h-3.5 bg-purple-500/20 rounded w-36" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="rounded border border-slate-800/50 p-2.5 space-y-1.5">
+                        <div className="h-2.5 bg-slate-700/50 rounded w-3/4" />
+                        <div className="h-1.5 bg-slate-800/50 rounded w-full" />
+                        <div className="h-2 bg-slate-800/50 rounded w-1/2" />
                       </div>
                     ))}
-                    {precedents.recommendation && (
-                      <div className="rounded bg-purple-900/30 p-2">
-                        <p className="text-xs text-purple-300">{precedents.recommendation}</p>
+                    <p className="text-xs text-slate-600 text-center pt-1">Searching historical ECOs for matches...</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!loadingPrecedents && precedents && (
+                <Card className="border-purple-500/30 bg-purple-950/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-purple-400" />
+                      Approval Precedents
+                      {precedents.has_precedents && (
+                        <Badge className="bg-purple-950/40 text-purple-400 border-purple-500/30 text-xs">
+                          {precedents.precedent_count} found
+                        </Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {precedents.has_precedents ? (
+                      <>
+                        <div className="rounded bg-purple-950/30 border border-purple-500/20 p-2.5">
+                          <p className="text-xs text-purple-300 leading-relaxed">{precedents.pattern_summary}</p>
+                        </div>
+
+                        {precedents.precedents?.map((p, i) => (
+                          <div key={i} className="rounded border border-slate-700/50 bg-slate-900/50 p-3 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs font-medium text-slate-200 leading-snug">{p.eco_title}</p>
+                              <div className="flex-shrink-0 text-right">
+                                <p
+                                  className={`text-sm font-bold tabular-nums ${p.similarity_score >= 80 ? 'text-green-400' : p.similarity_score >= 60 ? 'text-blue-400' : 'text-amber-400'}`}
+                                >
+                                  {p.similarity_score}%
+                                </p>
+                                <p className="text-xs text-slate-600">match</p>
+                              </div>
+                            </div>
+
+                            <div className="h-1 bg-slate-800 rounded-full">
+                              <div
+                                className={`h-1 rounded-full transition-all ${p.similarity_score >= 80 ? 'bg-green-400' : p.similarity_score >= 60 ? 'bg-blue-400' : 'bg-amber-400'}`}
+                                style={{ width: `${p.similarity_score}%` }}
+                              />
+                            </div>
+
+                            <p className="text-xs text-slate-400 italic leading-relaxed">"{p.approver_comment}"</p>
+
+                            <div className="flex gap-1.5">
+                              <span className="text-purple-400 text-xs flex-shrink-0 mt-0.5">→</span>
+                              <p className="text-xs text-purple-300">{p.key_lesson}</p>
+                            </div>
+
+                            <div className="flex justify-end">
+                              <span className="text-xs text-slate-600 bg-slate-800/50 px-2 py-0.5 rounded-full">
+                                Approved in {p.days_to_approve} day(s)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {precedents.recommendation && (
+                          <div className="rounded bg-green-950/20 border border-green-500/20 p-2.5">
+                            <p className="text-xs text-green-400 leading-relaxed">✓ {precedents.recommendation}</p>
+                          </div>
+                        )}
+
+                        {precedents.caution && (
+                          <div className="rounded bg-amber-950/20 border border-amber-500/20 p-2.5">
+                            <p className="text-xs text-amber-400 leading-relaxed">⚠ {precedents.caution}</p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-4 space-y-1">
+                        <BookOpen className="h-6 w-6 text-slate-600 mx-auto" />
+                        <p className="text-xs text-slate-500">{precedents.reason || 'No similar ECOs in history yet'}</p>
+                        <p className="text-xs text-slate-600">Improves as more ECOs are approved</p>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500">{precedents?.reason || 'No similar ECOs found in history'}</p>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           <Card className="bg-card border-border">

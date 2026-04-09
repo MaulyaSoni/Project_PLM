@@ -1,6 +1,9 @@
 const { prisma } = require('../lib/prisma');
 const { mapECO } = require('./_mappers');
 const ai = require('../services/ai.service');
+const { pickOptimalApprover } = require('../services/approverAssignment.service');
+const { learnFromCompletedEco } = require('../services/learning.service');
+const { notifyUser, notifyOperationsBriefing } = require('../services/notification.service');
 
 const stageNameToStatus = {
   New: 'NEW',
@@ -250,6 +253,22 @@ const submitForReview = async (req, res) => {
       }),
     ]);
 
+    let assignmentResult = null;
+    try {
+      assignmentResult = await pickOptimalApprover({ ecoId: id });
+      if (assignmentResult?.assigned?.id) {
+        await notifyUser({
+          userId: assignmentResult.assigned.id,
+          ecoId: id,
+          title: 'NIYANTRAK AI Review Assignment',
+          message: `You have been auto-assigned to review ECO ${eco.title}. ${assignmentResult.reasoning}`,
+          email: assignmentResult.assigned.email,
+        });
+      }
+    } catch (assignError) {
+      console.warn('Smart approver assignment failed:', assignError.message);
+    }
+
     // Proactive AI triggers on status transition to IN_REVIEW.
     try {
       const enriched = await prisma.eCO.findUnique({
@@ -410,7 +429,10 @@ const submitForReview = async (req, res) => {
       console.warn('Reactive AI submit triggers failed:', aiError.message);
     }
 
-    return res.json({ data: { id }, message: 'ECO submitted for review' });
+    return res.json({
+      data: { id, assignment: assignmentResult },
+      message: 'ECO submitted for review',
+    });
   } catch (error) {
     return serverError(res, error);
   }
@@ -545,7 +567,7 @@ const applyECO = async (req, res) => {
     const id = req.params.id;
     const doneStage = await findStageByStatus('DONE');
 
-    const eco = await prisma.eCO.findUnique({ where: { id } });
+    const eco = await prisma.eCO.findUnique({ where: { id }, include: { product: true } });
     if (!eco) return res.status(404).json({ error: 'ECO not found' });
     if (eco.status === 'DONE') return res.status(400).json({ error: 'This ECO has already been applied' });
     if (eco.status !== 'APPROVED') return res.status(400).json({ error: 'ECO must be approved before applying' });
@@ -697,6 +719,31 @@ const applyECO = async (req, res) => {
         },
       });
     }, { isolationLevel: 'Serializable' });
+
+    try {
+      await learnFromCompletedEco({ ecoId: id });
+    } catch (learningError) {
+      console.warn('Template learning update skipped:', learningError.message);
+    }
+
+    if (eco.type === 'BOM') {
+      const changes = Array.isArray(eco.bomComponentChanges) ? eco.bomComponentChanges : [];
+      const changeSummary = changes.length > 0
+        ? `${changes.length} component changes applied.`
+        : 'BOM revision applied.';
+
+      try {
+        await notifyOperationsBriefing({
+          ecoId: id,
+          productId: eco.productId,
+          productName: eco.product?.name || 'Unknown Product',
+          ecoTitle: eco.title,
+          changeSummary,
+        });
+      } catch (notifyError) {
+        console.warn('Operations briefing notification failed:', notifyError.message);
+      }
+    }
 
     return res.json({ data: { id }, message: 'ECO applied successfully' });
   } catch (error) {

@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Package, Layers, ArrowRight, Plus, Trash2, Sparkles, AlertTriangle, ShieldCheck, Info, Star } from 'lucide-react';
+import { Package, Layers, ArrowRight, Plus, Trash2, Sparkles, AlertTriangle, ShieldCheck, Info, Star, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ECO, ECOType, ECOProductChange, ECOBOMComponentChange } from '@/data/mockData';
@@ -44,6 +44,14 @@ type ConflictData = {
   }>;
 };
 
+type HotspotData = {
+  hotspots?: Array<{
+    field: string;
+    hitsLast60Days: number;
+    warning: string;
+  }>;
+};
+
 type TemplateSuggestion = {
   has_suggestion?: boolean;
   confidence?: string;
@@ -62,8 +70,10 @@ type TemplateSuggestion = {
 type QualityScore = {
   blocking?: boolean;
   total_score?: number;
+  grade?: string;
   summary?: string;
   improvements?: string[];
+  dimensions?: Record<string, { score: number }>;
 };
 
 type ApprovalPrediction = {
@@ -149,6 +159,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const [checkingConflicts, setCheckingConflicts] = useState(false);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
+  const [hotspotData, setHotspotData] = useState<HotspotData | null>(null);
   const [templateSuggestion, setTemplateSuggestion] = useState<TemplateSuggestion | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [qualityScore, setQualityScore] = useState<QualityScore | null>(null);
@@ -247,6 +258,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
   useEffect(() => {
     if (!open || !productId || !type) return;
     fetchTemplateSuggestion();
+    fetchConflictHotspots();
   }, [open, productId, type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -280,6 +292,7 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     setNewSalePrice(''); setNewCostPrice(''); setBomChanges([]);
     setDescription(''); setAiSummary(''); setAiTags([]);
     setConflictData(null);
+    setHotspotData(null);
     setTemplateSuggestion(null);
     setLoadingTemplate(false);
     setQualityScore(null);
@@ -334,6 +347,18 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
     }
   };
 
+  const fetchConflictHotspots = async () => {
+    if (!productId) return;
+    try {
+      const res = await api.get('/ai/conflict-hotspots', {
+        params: { productId },
+      });
+      setHotspotData(res.data?.data || null);
+    } catch {
+      setHotspotData(null);
+    }
+  };
+
   const handleStep2Next = async () => {
     setScoringDraft(true);
     try {
@@ -360,10 +385,9 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
         toast.warning('Quality score is low. Review suggestions before continuing.');
         return;
       }
-
-      setStep(3);
+      toast.success('Draft scored. Continue when ready.');
     } catch {
-      setStep(3);
+      toast.error('Scoring failed. You can retry.');
     } finally {
       setScoringDraft(false);
     }
@@ -812,59 +836,113 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
               </CardContent>
             </Card>
 
+            {hotspotData?.hotspots && hotspotData.hotspots.length > 0 && (
+              <Card className="border-amber-500/30 bg-amber-950/20">
+                <CardContent className="p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">Predictive Conflict Prevention</p>
+                  {hotspotData.hotspots.slice(0, 3).map((hotspot) => (
+                    <div key={hotspot.field} className="rounded border border-amber-500/20 bg-amber-950/20 px-2 py-1.5">
+                      <p className="text-xs text-amber-200">{hotspot.warning}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {loadingTemplate && (
-              <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-3 overflow-hidden animate-fade-in">
-                <div className="h-3 w-36 rounded bg-gradient-to-r from-muted via-muted-foreground/20 to-muted bg-[length:200%_100%] animate-shimmer" />
-                <div className="h-2.5 w-full rounded bg-gradient-to-r from-muted via-muted-foreground/15 to-muted bg-[length:200%_100%] animate-shimmer" />
-                <div className="h-2.5 w-3/4 rounded bg-gradient-to-r from-muted via-muted-foreground/15 to-muted bg-[length:200%_100%] animate-shimmer" />
+              <div className="rounded-lg border border-blue-500/20 bg-blue-950/10 p-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="h-4 w-4 text-blue-400" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-blue-500/20 rounded w-48" />
+                    <div className="h-2.5 bg-blue-500/10 rounded w-64" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-2 pl-11">
+                  Analyzing historical ECOs for this product...
+                </p>
               </div>
             )}
 
-            {templateSuggestion?.has_suggestion && (
-              <div className="rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 space-y-2">
-                <div className="flex items-center justify-between">
+            {!loadingTemplate && templateSuggestion?.has_suggestion && (
+              <div className="rounded-lg border border-blue-500/40 bg-gradient-to-r from-blue-950/30 to-transparent p-3 space-y-2.5 animate-in slide-in-from-top-2 duration-300">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm font-medium text-blue-300">AI Template Suggestion</span>
-                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400/30">
-                      {templateSuggestion.confidence} confidence
-                    </Badge>
+                    <div className="h-7 w-7 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-blue-300">AI Pattern Detected</p>
+                      <p className="text-xs text-slate-500">{templateSuggestion.pattern_detected}</p>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setTemplateSuggestion(null)}
-                    className="text-slate-500 h-6 w-6 p-0"
-                  >
-                    x
-                  </Button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className={`h-1.5 w-1.5 rounded-full ${templateSuggestion.confidence === 'HIGH' ? 'bg-green-400' : templateSuggestion.confidence === 'MEDIUM' ? 'bg-amber-400' : 'bg-slate-400'}`} />
+                    <span className="text-xs text-slate-400">{templateSuggestion.confidence} confidence</span>
+                    <button
+                      onClick={() => setTemplateSuggestion(null)}
+                      className="text-slate-600 hover:text-slate-400 transition-colors ml-1"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400">{templateSuggestion.insight}</p>
-                <p className="text-xs text-slate-500 italic">
-                  Pattern: {templateSuggestion.pattern_detected} · Based on {templateSuggestion.based_on_ecos} previous ECOs
-                </p>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (templateSuggestion.suggested_changes?.length > 0 && type === 'BOM') {
-                      const suggested = templateSuggestion.suggested_changes.map((c) => ({
-                        name: c.fieldName,
-                        oldQty: c.oldValue ? String(c.oldValue) : '0',
-                        newQty: c.newValue ? String(c.newValue) : '',
-                        changeType: c.changeType || 'CHANGED',
-                      }));
-                      setBomChanges(suggested);
-                    }
-                    if (!title) {
-                      setTitle(templateSuggestion.suggested_title_prefix || title);
-                    }
-                    toast.success('Template applied. Review and modify before submitting.');
-                    setTemplateSuggestion(null);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 h-7 text-xs"
-                >
-                  Apply Template
-                </Button>
+
+                <p className="text-xs text-slate-400 pl-9 leading-relaxed">{templateSuggestion.insight}</p>
+
+                {templateSuggestion.suggested_changes?.length > 0 && (
+                  <div className="pl-9 flex flex-wrap gap-1.5">
+                    {templateSuggestion.suggested_changes.slice(0, 3).map((ch, i) => (
+                      <span
+                        key={i}
+                        className={`text-xs px-2 py-0.5 rounded-full border ${ch.changeType === 'ADDED' ? 'bg-green-950/40 border-green-500/30 text-green-400' : ch.changeType === 'REMOVED' ? 'bg-red-950/40 border-red-500/30 text-red-400' : 'bg-amber-950/40 border-amber-500/30 text-amber-400'}`}
+                      >
+                        {ch.changeType === 'ADDED' ? '+ ' : ch.changeType === 'REMOVED' ? '− ' : '~ '}
+                        {ch.fieldName}
+                      </span>
+                    ))}
+                    {templateSuggestion.suggested_changes.length > 3 && (
+                      <span className="text-xs text-slate-500">
+                        +{templateSuggestion.suggested_changes.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-600 pl-9">Based on {templateSuggestion.based_on_ecos} previous ECO(s)</p>
+
+                <div className="pl-9 flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (templateSuggestion.suggested_changes?.length > 0) {
+                        if (type === 'BOM') {
+                          const suggested = templateSuggestion.suggested_changes.map((c) => ({
+                            name: c.fieldName || '',
+                            oldQty: c.oldValue != null ? String(c.oldValue) : '0',
+                            newQty: c.newValue != null ? String(c.newValue) : '',
+                            changeType: c.changeType || 'CHANGED',
+                          }));
+                          setBomChanges(suggested);
+                        }
+                        setTitle((prev) => prev || templateSuggestion.suggested_title_prefix || '');
+                        toast.success('Template applied — review before submitting', { icon: '✨' });
+                      }
+                      setTemplateSuggestion(null);
+                    }}
+                    className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Apply Template
+                  </button>
+                  <button
+                    onClick={() => setTemplateSuggestion(null)}
+                    className="text-xs text-slate-500 hover:text-slate-300 px-3 py-1.5 rounded-md transition-colors border border-slate-700/50"
+                  >
+                    Start Fresh
+                  </button>
+                </div>
               </div>
             )}
 
@@ -971,71 +1049,112 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
               </div>
             )}
 
-            {qualityScore && (
-              <div className={cn(
-                'rounded-lg border p-3 space-y-3',
-                qualityScore.blocking
-                  ? 'border-red-500/40 bg-red-950/20'
-                  : qualityScore.total_score <= 5
-                    ? 'border-amber-500/40 bg-amber-950/20'
-                    : 'border-green-500/40 bg-green-950/20'
-              )}>
+            {scoringDraft && (
+              <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 space-y-3 animate-pulse">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-white flex items-center gap-2">
-                    <Star className="h-4 w-4" />
-                    ECO Quality Score
-                  </span>
-                  <span className={cn(
-                    'text-2xl font-bold',
-                    qualityScore.blocking
-                      ? 'text-red-400'
-                      : qualityScore.total_score <= 5
-                        ? 'text-amber-400'
-                        : 'text-green-400'
-                  )}>
-                    {animatedQualityScore}/10
+                  <div className="h-3 bg-slate-700/60 rounded w-32" />
+                  <div className="h-8 w-12 bg-slate-700/60 rounded" />
+                </div>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} className="h-2 flex-1 rounded-sm bg-slate-700/60" />
+                  ))}
+                </div>
+                <div className="h-2.5 bg-slate-800/60 rounded w-3/4" />
+                <p className="text-xs text-slate-500 text-center">Scoring across 5 quality dimensions...</p>
+              </div>
+            )}
+
+            {qualityScore && !scoringDraft && (
+              <div
+                className={`rounded-lg border p-4 space-y-4 animate-in slide-in-from-bottom-2 duration-300 ${qualityScore.blocking ? 'border-red-500/50 bg-red-950/20' : qualityScore.total_score <= 5 ? 'border-amber-500/40 bg-amber-950/15' : qualityScore.total_score <= 7 ? 'border-blue-500/40 bg-blue-950/15' : 'border-green-500/40 bg-green-950/15'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className={`h-4 w-4 ${qualityScore.blocking ? 'text-red-400' : qualityScore.total_score <= 5 ? 'text-amber-400' : qualityScore.total_score <= 7 ? 'text-blue-400' : 'text-green-400'}`} />
+                    <span className="text-sm font-semibold text-white">ECO Quality Score</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${qualityScore.grade === 'EXCELLENT' ? 'bg-green-950/40 border-green-500/30 text-green-400' : qualityScore.grade === 'GOOD' ? 'bg-blue-950/40 border-blue-500/30 text-blue-400' : qualityScore.grade === 'FAIR' ? 'bg-amber-950/40 border-amber-500/30 text-amber-400' : 'bg-red-950/40 border-red-500/30 text-red-400'}`}>
+                      {qualityScore.grade}
+                    </span>
+                  </div>
+                  <span className={`text-3xl font-bold tabular-nums ${qualityScore.blocking ? 'text-red-400' : qualityScore.total_score <= 5 ? 'text-amber-400' : qualityScore.total_score <= 7 ? 'text-blue-400' : 'text-green-400'}`}>
+                    {animatedQualityScore}
+                    <span className="text-base font-normal text-slate-500">/10</span>
                   </span>
                 </div>
 
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                   {Array.from({ length: 10 }).map((_, i) => (
                     <div
                       key={i}
-                      className={cn(
-                        'h-2 flex-1 rounded-sm transition-all',
-                        i < animatedQualityScore
-                          ? qualityScore.blocking
-                            ? 'bg-red-400'
-                            : qualityScore.total_score <= 5
-                              ? 'bg-amber-400'
-                              : 'bg-green-400'
-                          : 'bg-slate-700'
-                      )}
-                      style={{ transitionDelay: `${i * 30}ms` }}
+                      className={`h-2 flex-1 rounded-sm transition-all duration-500 ${i < animatedQualityScore ? qualityScore.blocking ? 'bg-red-400' : qualityScore.total_score <= 5 ? 'bg-amber-400' : qualityScore.total_score <= 7 ? 'bg-blue-400' : 'bg-green-400' : 'bg-slate-800'}`}
                     />
                   ))}
                 </div>
 
-                <p className="text-xs text-slate-300">{qualityScore.summary}</p>
+                <p className="text-xs text-slate-300 leading-relaxed">{qualityScore.summary}</p>
 
-                {qualityScore.improvements?.length > 0 && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Suggestions:</p>
-                    {qualityScore.improvements.map((imp: string, i: number) => (
-                      <p key={i} className="text-xs text-slate-400">- {imp}</p>
+                {qualityScore.dimensions && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Breakdown</p>
+                    {Object.entries(qualityScore.dimensions).map(([key, dim]) => (
+                      <div key={key} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${dim.score === 2 ? 'bg-green-400' : dim.score === 1 ? 'bg-amber-400' : 'bg-red-400'}`} />
+                          <span className="text-xs text-slate-400 capitalize truncate">{key.replace(/_/g, ' ')}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <div className="flex gap-0.5">
+                            {[0, 1, 2].map((v) => (
+                              <div
+                                key={v}
+                                className={`h-1.5 w-4 rounded-sm ${v < dim.score ? dim.score === 2 ? 'bg-green-400' : 'bg-amber-400' : 'bg-slate-700'}`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs text-slate-500 w-6 text-right">{dim.score}/2</span>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  {!qualityScore.blocking && (
-                    <Button size="sm" onClick={() => setStep(3)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                {qualityScore.improvements?.length > 0 && (
+                  <div className="space-y-1 border-t border-slate-700/50 pt-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Suggestions</p>
+                    {qualityScore.improvements.map((imp, i) => (
+                      <p key={i} className="text-xs text-slate-400 flex gap-2">
+                        <span className="text-amber-400 flex-shrink-0">→</span>
+                        {imp}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  {!qualityScore.blocking ? (
+                    <button
+                      onClick={() => {
+                        setQualityScore(null);
+                        setStep(3);
+                      }}
+                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-2 rounded-md transition-colors flex items-center justify-center gap-1.5"
+                    >
                       Continue to Review
-                    </Button>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <div className="flex-1 rounded-md border border-red-500/30 bg-red-950/20 px-3 py-2 text-center">
+                      <p className="text-xs text-red-400 font-medium">Score too low to submit</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Address the suggestions above first</p>
+                    </div>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setQualityScore(null)} className="border-slate-600">
-                    Improve First
-                  </Button>
+                  <button
+                    onClick={() => setQualityScore(null)}
+                    className="text-xs text-slate-500 hover:text-slate-300 px-3 py-2 rounded-md border border-slate-700/50 transition-colors"
+                  >
+                    Improve
+                  </button>
                 </div>
               </div>
             )}
@@ -1083,9 +1202,23 @@ export default function CreateECODialog({ open, onOpenChange, initialType, initi
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleStep2Next} disabled={scoringDraft}>
-                {scoringDraft ? 'Scoring...' : 'Next'}
-              </Button>
+              <button
+                onClick={handleStep2Next}
+                disabled={scoringDraft}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm transition-colors"
+              >
+                {scoringDraft ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Scoring draft...
+                  </>
+                ) : (
+                  <>
+                    Next — Review
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}

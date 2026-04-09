@@ -6,11 +6,15 @@ dotenv.config({ path: path.resolve(__dirname, '.env'), override: true });
 
 const app = require('./src/app');
 const { PORT } = require('./src/config/env');
-const { startAgentScheduler } = require('./src/services/agentScheduler.service');
+const { startAgentScheduler: startLegacyAgentScheduler } = require('./src/services/agentScheduler.service');
+const { startAgentScheduler } = require('./src/services/agent.service');
 
 const server = app.listen(PORT, () => {
-  console.log(`PLM Backend started successfully on port ${PORT}.`);
-  startAgentScheduler();
+  console.log(`NIYANTRAK AI backend started successfully on port ${PORT}.`);
+  if (process.env.NODE_ENV !== 'test') {
+    startLegacyAgentScheduler();
+    startAgentScheduler();
+  }
 });
 
 server.on('error', (error) => {

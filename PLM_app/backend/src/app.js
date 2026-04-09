@@ -18,7 +18,7 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/', (_req, res) => {
-  res.json({ message: 'PLM API running' });
+  res.json({ message: 'NIYANTRAK AI API running' });
 });
 
 app.get('/api/health', (_req, res) => {

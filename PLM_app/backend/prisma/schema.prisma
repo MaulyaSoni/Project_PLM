@@ -54,6 +54,7 @@ model User {
   approvals   ECOApproval[]
   auditLogs   AuditLog[]
   aiResults   AiResult[]
+  notifications Notification[]
 }
 
 model Product {
@@ -160,12 +161,18 @@ model ECO {
   auditLogs          AuditLog[]
   aiResults          AiResult[]
   agentActions       AgentAction[]
+  learningRecords    TemplateLearningRecord[]
+  notifications      Notification[]
 }
 
 model AgentAction {
   id           String   @id @default(uuid())
-  ecoId        String   @map("eco_id")
+  ecoId        String?  @map("eco_id")
+  targetUserId String?  @map("target_user_id")
   actionType   String   @map("action_type")
+  reasoning    String?
+  context      String?
+  outcome      String?
   status       String   @default("EXECUTED")
   reason       String?
   message      String
@@ -176,7 +183,7 @@ model AgentAction {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  eco          ECO      @relation(fields: [ecoId], references: [id], onDelete: Cascade)
+  eco          ECO?     @relation(fields: [ecoId], references: [id], onDelete: Cascade)
 
   @@index([ecoId, actionType, createdAt])
   @@map("agent_actions")
@@ -228,4 +235,41 @@ model AuditLog {
 
   eco        ECO?            @relation(fields: [ecoId], references: [id], onDelete: SetNull)
   user       User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model TemplateLearningRecord {
+  id                  String   @id @default(uuid())
+  ecoId               String   @unique @map("eco_id")
+  productId           String   @map("product_id")
+  ecoType             ECOType  @map("eco_type")
+  title               String
+  description         String?  @db.Text
+  normalizedPattern   String   @map("normalized_pattern") @db.Text
+  outcomeQualityScore Float?   @map("outcome_quality_score")
+  cycleTimeDays       Float?   @map("cycle_time_days")
+  approvedFirstPass   Boolean  @default(false) @map("approved_first_pass")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  eco                 ECO      @relation(fields: [ecoId], references: [id], onDelete: Cascade)
+
+  @@index([productId, ecoType, createdAt])
+  @@map("template_learning_records")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  ecoId      String?  @map("eco_id")
+  channel    String
+  title      String
+  message    String   @db.Text
+  metadata   Json?
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eco        ECO?     @relation(fields: [ecoId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
