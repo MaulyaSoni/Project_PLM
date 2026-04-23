@@ -9,10 +9,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import api from '@/services/api';
 
+type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  readAt: string | null;
+};
+
 export function TopNavbar() {
   const { user } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     let active = true;

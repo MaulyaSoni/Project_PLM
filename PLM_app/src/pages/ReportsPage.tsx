@@ -201,7 +201,7 @@ export default function ReportsPage() {
 
   const getOutputSummary = (result: AiResultRow) => {
     try {
-      const out = JSON.parse(result.output || '{}') as Record<string, any>;
+      const out = JSON.parse(result.output || '{}') as Record<string, unknown>;
       switch (result.featureType) {
         case 'QUALITY_SCORE':
           return `Score: ${out.total_score}/10 — ${out.grade}`;

@@ -17,6 +17,22 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { settingsService, type StageItem, type UserItem } from '@/services/settings.service';
 import api from '@/services/api';
 
+type AgentAction = {
+  id: string;
+  actionType: string;
+  reasoning?: string;
+  reason?: string;
+  message?: string;
+  createdAt: string;
+};
+
+type BottleneckData = {
+  has_bottleneck: boolean;
+  severity?: string;
+  summary?: string;
+  recommendation?: string;
+};
+
 export default function SettingsPage() {
   const { user } = useAuthStore();
   const [stages, setStages] = useState<StageItem[]>([]);
@@ -29,8 +45,8 @@ export default function SettingsPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('ENGINEERING');
-  const [agentActions, setAgentActions] = useState<any[]>([]);
-  const [bottleneckData, setBottleneckData] = useState<any | null>(null);
+  const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
+  const [bottleneckData, setBottleneckData] = useState<BottleneckData | null>(null);
   const [runningAgent, setRunningAgent] = useState(false);
   const [overrideEcoId, setOverrideEcoId] = useState('');
   const [overrideApproverId, setOverrideApproverId] = useState('');
@@ -144,8 +160,9 @@ export default function SettingsPage() {
       setAddStageOpen(false);
       setNewStageName('');
       setNewStageApproval(false);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to add stage');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      toast.error(axiosError?.response?.data?.error || 'Failed to add stage');
     }
   };
 
@@ -158,8 +175,9 @@ export default function SettingsPage() {
       const updated = await settingsService.updateUserRole(id, role);
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role: updated.role } : u)));
       toast.success('User role updated');
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to update role');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      toast.error(axiosError?.response?.data?.error || 'Failed to update role');
     }
   };
 
